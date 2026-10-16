@@ -2,7 +2,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { NOTES, commit, isStale, newNote, rebuild, relatedNotes, search, summary, today, withUpdate } from "./notebook.ts";
+import { NOTES, commit, isStale, listNotes, matchNotes, newNote, rebuild, relatedNotes, search, summary, today, withUpdate } from "./notebook.ts";
 
 export default async function plugin(bb: BbPluginApi) {
   let queue = Promise.resolve();
@@ -41,6 +41,21 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.contributeInstructions(({ threadId }) => related.get(threadId) ?? null);
   bb.events.on("thread.archived", ({ thread }) => void related.delete(thread.id));
   bb.events.on("thread.deleted", ({ thread }) => void related.delete(thread.id));
+
+  bb.ui.registerMentionProvider({
+    id: "note",
+    label: "Conclave",
+    search({ query }) {
+      return matchNotes(listNotes(), query)
+        .slice(0, 8)
+        .map((note) => ({ id: note.slug, title: note.slug, subtitle: note.summary, icon: "NotebookPen" }));
+    },
+    resolve(slug) {
+      if (!/^[a-z0-9-]+$/.test(slug)) throw new Error(`Bad note id ${slug}`);
+      const path = join(NOTES, `${slug}.md`);
+      return { context: `Conclave note [[${slug}]] (${path}):\n\n${readFileSync(path, "utf8").slice(0, 30_000)}` };
+    },
+  });
 
   bb.agents.registerTool({
     name: "conclave_search",

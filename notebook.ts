@@ -105,3 +105,19 @@ export function relatedNotes(hits: Hit[], describe: (slug: string) => string): s
     ...lines,
   ].join("\n");
 }
+
+export function listNotes(): { slug: string; summary: string }[] {
+  return readdirSync(NOTES)
+    .filter((file) => file.endsWith(".md"))
+    .map((file) => ({ file, mtime: statSync(join(NOTES, file)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime)
+    .map(({ file }) => {
+      const slug = file.slice(0, -3);
+      return { slug, summary: summary(slug) };
+    });
+}
+
+export function matchNotes<T extends { slug: string; summary: string }>(notes: T[], query: string): T[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  return notes.filter((note) => words.every((word) => `${note.slug} ${note.summary}`.toLowerCase().includes(word)));
+}

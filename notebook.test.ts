@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { newNote, parseHits, relatedNotes, withUpdate } from "./notebook.ts";
+import { matchNotes, newNote, parseHits, relatedNotes, withUpdate } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -66,4 +66,13 @@ test("relatedNotes keeps up to three notes close to the top score", () => {
     "Notes in the user's conclave notebook (~/Documents/Notes/conclave) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:\n- [[n0]]: about n0\n- [[n1]]: about n1\n- [[n2]]: about n2",
   );
   assert.equal(relatedNotes([{ slug: "weak", score: 1.5, text: "" }], () => ""), null);
+});
+
+test("matchNotes needs every word in the slug or summary", () => {
+  const notes = [
+    { slug: "trainz", summary: "The living note for Trainz" },
+    { slug: "pippi-health-log", summary: "Pippi sandbox health log" },
+  ];
+  assert.deepEqual(matchNotes(notes, "pip log").map((note) => note.slug), ["pippi-health-log"]);
+  assert.deepEqual(matchNotes(notes, "").length, 2);
 });
