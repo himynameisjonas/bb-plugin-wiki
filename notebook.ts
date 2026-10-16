@@ -91,3 +91,15 @@ export async function commit(message?: string): Promise<boolean> {
   await git("commit", "-q", "-m", message ?? `conclave: update ${slugs.join(", ") || "notes"}`, "--", "conclave");
   return true;
 }
+
+// ponytail: BM25 scores don't separate well, so this is a loose hint, not a verdict
+export function relatedNotes(hits: Hit[], describe: (slug: string) => string): string | null {
+  const top = hits[0]?.score ?? 0;
+  const picked = hits.filter((hit) => hit.score >= 2 && hit.score >= top * 0.6).slice(0, 3);
+  if (picked.length === 0) return null;
+  const lines = picked.map((hit) => `- [[${hit.slug}]]: ${describe(hit.slug)}`);
+  return [
+    "Notes in the user's conclave notebook (~/Documents/Notes/conclave) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:",
+    ...lines,
+  ].join("\n");
+}

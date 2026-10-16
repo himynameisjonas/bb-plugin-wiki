@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { newNote, parseHits, withUpdate } from "./notebook.ts";
+import { newNote, parseHits, relatedNotes, withUpdate } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -57,4 +57,13 @@ test("withUpdate appends when there is no Related notes", () => {
     withUpdate("Intro\n", "2026-10-16", "[t](u)", "New fact."),
     "Intro\n\n## Update [[daily/2026-10-16|2026-10-16]]\n\nSource: [t](u)\n\nNew fact.\n",
   );
+});
+
+test("relatedNotes keeps up to three notes close to the top score", () => {
+  const hits = [6, 5, 4, 3.9, 1].map((score, index) => ({ slug: `n${index}`, score, text: "" }));
+  assert.equal(
+    relatedNotes(hits, (slug) => `about ${slug}`),
+    "Notes in the user's conclave notebook (~/Documents/Notes/conclave) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:\n- [[n0]]: about n0\n- [[n1]]: about n1\n- [[n2]]: about n2",
+  );
+  assert.equal(relatedNotes([{ slug: "weak", score: 1.5, text: "" }], () => ""), null);
 });

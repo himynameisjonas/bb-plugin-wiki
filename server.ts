@@ -2,7 +2,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { NOTES, commit, isStale, newNote, rebuild, search, summary, today, withUpdate } from "./notebook.ts";
+import { NOTES, commit, isStale, newNote, rebuild, relatedNotes, search, summary, today, withUpdate } from "./notebook.ts";
 
 export default async function plugin(bb: BbPluginApi) {
   let queue = Promise.resolve();
@@ -24,6 +24,23 @@ export default async function plugin(bb: BbPluginApi) {
 
   sync().catch(() => {});
   bb.events.on("thread.idle", () => sync().catch(() => {}));
+
+  // ponytail: in memory, so a server restart loses hints for threads already running
+  const related = new Map<string, string | null>();
+  bb.experimental_hooks.on("message.dispatch", async (ctx) => {
+    if (!related.has(ctx.thread.id) && ctx.input.text.trim()) {
+      related.set(ctx.thread.id, null);
+      try {
+        related.set(ctx.thread.id, relatedNotes(await search(ctx.input.text, 8), summary));
+      } catch (error) {
+        bb.log.warn(`related notes failed: ${error}`);
+      }
+    }
+    return { action: "proceed" };
+  });
+  bb.agents.contributeInstructions(({ threadId }) => related.get(threadId) ?? null);
+  bb.events.on("thread.archived", ({ thread }) => void related.delete(thread.id));
+  bb.events.on("thread.deleted", ({ thread }) => void related.delete(thread.id));
 
   bb.agents.registerTool({
     name: "conclave_search",
