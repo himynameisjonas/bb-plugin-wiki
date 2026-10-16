@@ -13,7 +13,8 @@
       "icon": "NotebookPen"
     },
     "server": "./server.ts",
-    "skills": []
+    "skills": [],
+    "app": "./app.tsx"
   },
   "scripts": {
     "typecheck": "tsc",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@get-bb/plugin-sdk": "0.5.29",
     "@types/node": "^22.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "@types/react": "^19.0.0"
   }
 }

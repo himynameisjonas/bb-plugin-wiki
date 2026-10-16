@@ -95,9 +95,13 @@ export async function commit(message?: string): Promise<boolean> {
 }
 
 // ponytail: BM25 scores don't separate well, so this is a loose hint, not a verdict
-export function relatedNotes(hits: Hit[], describe: (slug: string) => string): string | null {
+export function pickRelated(hits: Hit[]): Hit[] {
   const top = hits[0]?.score ?? 0;
-  const picked = hits.filter((hit) => hit.score >= 2 && hit.score >= top * 0.6).slice(0, 3);
+  return hits.filter((hit) => hit.score >= 2 && hit.score >= top * 0.6).slice(0, 3);
+}
+
+export function relatedNotes(hits: Hit[], describe: (slug: string) => string): string | null {
+  const picked = pickRelated(hits);
   if (picked.length === 0) return null;
   const lines = picked.map((hit) => `- [[${hit.slug}]]: ${describe(hit.slug)}`);
   return [
@@ -120,4 +124,10 @@ export function listNotes(): { slug: string; summary: string }[] {
 export function matchNotes<T extends { slug: string; summary: string }>(notes: T[], query: string): T[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   return notes.filter((note) => words.every((word) => `${note.slug} ${note.summary}`.toLowerCase().includes(word)));
+}
+
+export function notesLinking(threadId: string): string[] {
+  return readdirSync(NOTES)
+    .filter((file) => file.endsWith(".md") && readFileSync(join(NOTES, file), "utf8").includes(threadId))
+    .map((file) => file.slice(0, -3));
 }

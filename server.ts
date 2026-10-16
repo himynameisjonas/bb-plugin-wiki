@@ -1,8 +1,37 @@
-import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { NOTES, commit, isStale, listNotes, matchNotes, newNote, rebuild, relatedNotes, search, summary, today, withUpdate } from "./notebook.ts";
+import {
+  NOTES,
+  type Hit,
+  commit,
+  isStale,
+  listNotes,
+  matchNotes,
+  newNote,
+  notesLinking,
+  pickRelated,
+  rebuild,
+  relatedNotes,
+  search,
+  summary,
+  today,
+  withUpdate,
+} from "./notebook.ts";
+
+const noteSchema = z.object({ slug: z.string(), summary: z.string() });
+const threadNotesSchema = z.object({
+  hostId: z.string().nullable(),
+  notesDir: z.string(),
+  linked: z.array(noteSchema),
+  related: z.array(noteSchema),
+});
+export type ThreadNotes = z.infer<typeof threadNotesSchema>;
+
+export const rpcContract = defineRpcContract({
+  thread_notes: { input: z.object({ threadId: z.string() }), output: threadNotesSchema },
+});
 
 export default async function plugin(bb: BbPluginApi) {
   let queue = Promise.resolve();
@@ -26,19 +55,38 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.idle", () => sync().catch(() => {}));
 
   // ponytail: in memory, so a server restart loses hints for threads already running
-  const related = new Map<string, string | null>();
+  const related = new Map<string, Hit[]>();
   bb.experimental_hooks.on("message.dispatch", async (ctx) => {
     if (!related.has(ctx.thread.id) && ctx.input.text.trim()) {
-      related.set(ctx.thread.id, null);
+      related.set(ctx.thread.id, []);
       try {
-        related.set(ctx.thread.id, relatedNotes(await search(ctx.input.text, 8), summary));
+        related.set(ctx.thread.id, await search(ctx.input.text, 8));
       } catch (error) {
         bb.log.warn(`related notes failed: ${error}`);
       }
     }
     return { action: "proceed" };
   });
-  bb.agents.contributeInstructions(({ threadId }) => related.get(threadId) ?? null);
+  bb.agents.contributeInstructions(({ threadId }) => relatedNotes(related.get(threadId) ?? [], summary));
+
+  bb.rpc.register(rpcContract, {
+    async thread_notes({ threadId }) {
+      const linked = notesLinking(threadId);
+      let hits = related.get(threadId);
+      if (!hits?.length) {
+        const thread = await bb.sdk.threads.get({ threadId });
+        const title = thread.title ?? thread.titleFallback;
+        hits = title ? await search(title, 8) : [];
+      }
+      const note = (slug: string) => ({ slug, summary: summary(slug) });
+      return {
+        hostId: (await bb.sdk.system.config()).primaryHostId,
+        notesDir: NOTES,
+        linked: linked.map(note),
+        related: pickRelated(hits).filter((hit) => !linked.includes(hit.slug)).map((hit) => note(hit.slug)),
+      };
+    },
+  });
   bb.events.on("thread.archived", ({ thread }) => void related.delete(thread.id));
   bb.events.on("thread.deleted", ({ thread }) => void related.delete(thread.id));
 
