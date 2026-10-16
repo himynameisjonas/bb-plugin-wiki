@@ -44,11 +44,12 @@ export default async function plugin(bb: BbPluginApi) {
     return job;
   };
 
-  const threadLink = async (threadId: string, projectId: string) => {
+  // /threads/<id> opens Personal-project threads too; /projects/proj_personal/... redirects home
+  const threadLink = async (threadId: string) => {
     const thread = await bb.sdk.threads.get({ threadId });
     const base = bb.server.experimental_appUrl ?? bb.server.loopbackBaseUrl;
     const label = (thread.title ?? thread.titleFallback ?? threadId).replace(/[[\]]/g, "");
-    return `[${label}](${base}/projects/${projectId}/threads/${threadId})`;
+    return `[${label}](${base}/threads/${threadId})`;
   };
 
   sync().catch(() => {});
@@ -139,9 +140,9 @@ export default async function plugin(bb: BbPluginApi) {
       summary: z.string().max(300).optional().describe("One-line summary. Required for create."),
       body: z.string().min(1).describe("Markdown. For create, start with a # heading and end with ## Related notes."),
     }),
-    async execute({ slug, mode, summary: line, body }, { threadId, projectId }) {
+    async execute({ slug, mode, summary: line, body }, { threadId }) {
       const path = join(NOTES, `${slug}.md`);
-      const source = await threadLink(threadId, projectId);
+      const source = await threadLink(threadId);
       if (mode === "create") {
         if (existsSync(path)) return { content: [{ type: "text", text: `[[${slug}]] exists. Use mode=update.` }], isError: true };
         if (!line) return { content: [{ type: "text", text: "summary is required for create." }], isError: true };
