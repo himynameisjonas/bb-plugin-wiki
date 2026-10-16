@@ -16,6 +16,9 @@ export const PALACE = join(home, ".local/share/mempalace/conclave.db");
 
 export type Hit = { slug: string; score: number; text: string };
 
+// A Markdown file link is clickable in BB chat and opens the note in the side panel; [[slug]] is not.
+export const noteLink = (slug: string) => `[${slug}](${join(NOTES, `${slug}.md`)})`;
+
 export function parseHits(output: string): Hit[] {
   const hits: Hit[] = [];
   const seen = new Set<string>();
@@ -103,7 +106,7 @@ export function pickRelated(hits: Hit[]): Hit[] {
 export function relatedNotes(hits: Hit[], describe: (slug: string) => string): string | null {
   const picked = pickRelated(hits);
   if (picked.length === 0) return null;
-  const lines = picked.map((hit) => `- [[${hit.slug}]]: ${describe(hit.slug)}`);
+  const lines = picked.map((hit) => `- ${noteLink(hit.slug)}: ${describe(hit.slug)}`);
   return [
     "Notes in the user's conclave notebook (~/Documents/Notes/conclave) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:",
     ...lines,

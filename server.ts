@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   NOTES,
+  noteLink,
   type Hit,
   commit,
   isStale,
@@ -111,7 +112,7 @@ export default async function plugin(bb: BbPluginApi) {
     description:
       "Search the user's conclave notebook (personal notes in ~/Documents/Notes/conclave) by keywords. BM25, so use words likely to appear in a note. Returns note slugs, one-line summaries and matching snippets.",
     instructions:
-      "Use conclave_search before starting work that earlier notes might cover, and when the user asks what they know or wrote about something. Cite notes as [[slug]].",
+      "Use conclave_search before starting work that earlier notes might cover, and when the user asks what they know or wrote about something. In chat, cite notes as Markdown file links like [slug](/path/to/slug.md) so they are clickable. Inside notes, keep [[slug]].",
     presentation: { label: { pending: "Searching conclave", completed: "Searched conclave" } },
     parameters: z.object({
       query: z.string().min(1),
@@ -122,7 +123,7 @@ export default async function plugin(bb: BbPluginApi) {
       const hits = await search(query, limit);
       if (hits.length === 0) return "No matching notes.";
       return hits
-        .map((hit) => `[[${hit.slug}]] (${hit.score.toFixed(2)}): ${summary(hit.slug)}\n${hit.text.slice(0, 600)}`)
+        .map((hit) => `${noteLink(hit.slug)} (${hit.score.toFixed(2)}): ${summary(hit.slug)}\n${hit.text.slice(0, 600)}`)
         .join("\n\n");
     },
   });
@@ -152,7 +153,7 @@ export default async function plugin(bb: BbPluginApi) {
         writeFileSync(path, withUpdate(readFileSync(path, "utf8"), today(), source, body));
       }
       await sync(`conclave: ${mode === "create" ? line : `update ${slug}`}`);
-      return `Saved [[${slug}]] (${path}). Committed and reindexed.`;
+      return `Saved ${noteLink(slug)}. Committed and reindexed.`;
     },
   });
 }
