@@ -41,7 +41,45 @@ export function parseHits(output: string): Hit[] {
   return hits;
 }
 
+export const hasMempalace = () => existsSync(paths.mempalace);
+
+const words = (text: string): string[] => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+
+// Plain BM25 (k1 1.2, b 0.75), so scores land in the same range as mempalace's and the related-notes cutoff still fits.
+export function rankNotes(docs: { slug: string; text: string }[], query: string, limit = 5): Hit[] {
+  const terms = [...new Set(words(query))];
+  const tokenized = docs.map((doc) => ({ ...doc, tokens: words(`${doc.slug.replace(/-/g, " ")} ${doc.text}`) }));
+  const avgLength = tokenized.reduce((sum, doc) => sum + doc.tokens.length, 0) / (tokenized.length || 1);
+  const idf = new Map(
+    terms.map((term) => {
+      const df = tokenized.filter((doc) => doc.tokens.includes(term)).length;
+      return [term, Math.log((tokenized.length - df + 0.5) / (df + 0.5) + 1)];
+    }),
+  );
+  return tokenized
+    .map((doc) => {
+      let score = 0;
+      for (const term of terms) {
+        const tf = doc.tokens.filter((token) => token === term).length;
+        if (tf) score += idf.get(term)! * ((tf * 2.2) / (tf + 1.2 * (0.25 + (0.75 * doc.tokens.length) / avgLength)));
+      }
+      const line = doc.text.split("\n").find((text) => terms.some((term) => words(text).includes(term))) ?? "";
+      return { slug: doc.slug, score, text: line.trim().slice(0, 600) };
+    })
+    .filter((hit) => hit.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+function wordSearch(query: string, limit: number): Hit[] {
+  const docs = readdirSync(paths.notes)
+    .filter((file) => file.endsWith(".md") && file !== `${INDEX}.md`)
+    .map((file) => ({ slug: file.slice(0, -3), text: readFileSync(join(paths.notes, file), "utf8") }));
+  return rankNotes(docs, query.slice(0, 500), limit);
+}
+
 export async function search(query: string, limit = 5): Promise<Hit[]> {
+  if (!hasMempalace()) return wordSearch(query, limit);
   const { stdout } = await run(
     paths.mempalace,
     ["--palace", paths.palace, "search", "--wing", "conclave", "--results", String(limit * 3), "--", query.slice(0, 500)],

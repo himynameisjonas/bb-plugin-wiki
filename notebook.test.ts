@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { format, indexContent, matchNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
+import { format, indexContent, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -109,4 +109,17 @@ test("the date line follows the date style", () => {
   } finally {
     format.dateStyle = "obsidian-daily";
   }
+});
+
+test("rankNotes ranks the note that matches the query best first", () => {
+  const docs = [
+    { slug: "kafka-rebalancing", text: "Consumer group rebalancing.\nStatic membership avoids rebalances on deploys." },
+    { slug: "trainz", text: "A train game with tracks and stations." },
+    { slug: "deploy-notes", text: "How we deploy the monolith." },
+  ];
+  const hits = rankNotes(docs, "kafka static membership", 5);
+  assert.equal(hits[0].slug, "kafka-rebalancing");
+  assert.equal(hits[0].text, "Static membership avoids rebalances on deploys.");
+  assert.ok(!hits.some((hit) => hit.slug === "trainz"));
+  assert.deepEqual(rankNotes(docs, "nothing here matches", 5), []);
 });

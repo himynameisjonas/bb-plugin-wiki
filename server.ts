@@ -8,6 +8,7 @@ import {
   configure,
   paths,
   format,
+  hasMempalace,
   noteLink,
   type Hit,
   commit,
@@ -51,7 +52,7 @@ const WRAP_UP = [
 export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
     notes: { type: "string", label: "Notes folder", description: "Folder with the Markdown notes. ~ is your home folder.", default: DEFAULTS.notes },
-    mempalace: { type: "string", label: "mempalace binary", description: "Path to the mempalace binary, used for search.", default: DEFAULTS.mempalace },
+    mempalace: { type: "string", label: "mempalace binary", description: "Path to the mempalace binary. Optional: without it the plugin uses a built-in word search.", default: DEFAULTS.mempalace },
     palace: { type: "string", label: "Search index file", description: "The plugin rebuilds this file from the notes.", default: DEFAULTS.palace },
     dateStyle: {
       type: "select",
@@ -64,11 +65,10 @@ export default async function plugin(bb: BbPluginApi) {
   const apply = (values: typeof DEFAULTS & { dateStyle: string }) => {
     configure(values);
     format.dateStyle = DATE_STYLES.find((style) => style === values.dateStyle) ?? "obsidian-daily";
-    const missing = [
-      !existsSync(paths.notes) && `the notes folder ${paths.notes}`,
-      !existsSync(paths.mempalace) && `mempalace at ${paths.mempalace}`,
-    ].filter(Boolean);
-    if (missing.length) bb.status.needsConfiguration(`Can't find ${missing.join(" or ")}. Fix the paths in the plugin settings, then run \`bb plugin reload conclave\`.`);
+    if (!existsSync(paths.notes)) {
+      bb.status.needsConfiguration(`Can't find the notes folder ${paths.notes}. Fix it in the plugin settings, then run \`bb plugin reload conclave\`.`);
+    }
+    if (!hasMempalace()) bb.log.info(`No mempalace at ${paths.mempalace}, using the built-in word search`);
   };
   apply(await settings.get());
   let queue = Promise.resolve();
@@ -77,7 +77,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (!existsSync(paths.notes)) return;
       writeIndex();
       await commit(message);
-      if (isStale()) await rebuild();
+      if (hasMempalace() && isStale()) await rebuild();
     });
     queue = job.catch((error) => bb.log.error(`sync failed: ${error}`));
     return job;
