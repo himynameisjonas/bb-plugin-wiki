@@ -53,6 +53,10 @@ function ConclavePanel({ threadId }: { threadId: string }) {
     <div className="space-y-6">
       <NoteList title="Written in this thread" empty="No note links to this thread yet." notes={data.linked} data={data} />
       <NoteList title="May be related" empty="No related notes found." notes={data.related} data={data} />
+      <p className="text-xs text-muted-foreground">
+        Notebook: {data.lint.orphans} orphan notes, {data.lint.broken} broken links, {data.lint.noRelated} notes without Related
+        notes. Run <code>bb conclave lint</code> for the lists.
+      </p>
     </div>
   );
 }

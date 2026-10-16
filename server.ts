@@ -37,6 +37,7 @@ const threadNotesSchema = z.object({
   notesDir: z.string(),
   linked: z.array(noteSchema),
   related: z.array(noteSchema),
+  lint: z.object({ orphans: z.number(), broken: z.number(), noRelated: z.number() }),
 });
 export type ThreadNotes = z.infer<typeof threadNotesSchema>;
 
@@ -149,11 +150,13 @@ export default async function plugin(bb: BbPluginApi) {
     async thread_notes({ threadId }) {
       const { linked, related } = await notesFor(threadId);
       const note = (slug: string) => ({ slug, summary: summary(slug) });
+      const { orphans, broken, noRelated } = lint(readNotes());
       return {
         hostId: (await bb.sdk.system.config()).primaryHostId,
         notesDir: paths.notes,
         linked: linked.map(note),
         related: related.map(note),
+        lint: { orphans: orphans.length, broken: broken.length, noRelated: noRelated.length },
       };
     },
   });
