@@ -96,7 +96,7 @@ export default async function plugin(bb: BbPluginApi) {
     search({ query }) {
       return matchNotes(listNotes(), query)
         .slice(0, 8)
-        .map((note) => ({ id: note.slug, title: note.slug, subtitle: note.summary, icon: "NotebookPen" }));
+        .map((note) => ({ id: note.slug, title: note.slug, subtitle: note.summary }));
     },
     resolve(slug) {
       if (!/^[a-z0-9-]+$/.test(slug)) throw new Error(`Bad note id ${slug}`);
