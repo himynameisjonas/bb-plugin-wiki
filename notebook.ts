@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -63,9 +63,11 @@ export async function rebuild(): Promise<void> {
   const next = `${PALACE}.next`;
   for (const suffix of ["", "-wal", "-shm"]) rmSync(next + suffix, { force: true });
   await run(MEMPALACE, ["--palace", next, "mine", "--wing", "conclave", NOTES], { timeout: 60_000 });
-  // ponytail: a reader mid-swap gets one failed search, fine for a CLI lookup
+  // ponytail: a reader mid-swap gets one odd search, fine for a CLI lookup
   for (const suffix of ["-wal", "-shm"]) rmSync(PALACE + suffix, { force: true });
   renameSync(next, PALACE);
+  if (existsSync(`${next}-wal`)) renameSync(`${next}-wal`, `${PALACE}-wal`);
+  rmSync(`${next}-shm`, { force: true });
 }
 
 export const today = () => new Date().toLocaleDateString("sv-SE");
