@@ -16,7 +16,9 @@
       }
     },
     "server": "./server.ts",
-    "skills": [],
+    "skills": [
+      "skills"
+    ],
     "app": "./app.tsx"
   },
   "scripts": {
