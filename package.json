@@ -1,0 +1,30 @@
+{
+  "name": "bb-plugin-conclave",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.44",
+    "bbPluginSdk": ">=0.5.29"
+  },
+  "bb": {
+    "name": "Conclave",
+    "description": "Search and write the conclave notebook from BB threads.",
+    "branding": {
+      "icon": "NotebookPen"
+    },
+    "server": "./server.ts",
+    "skills": []
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.29",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
