@@ -7,7 +7,8 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const home = homedir();
 
-export const NOTES = join(home, "Documents/Notes/conclave");
+export const REPO = join(home, "Documents/Notes");
+export const NOTES = join(REPO, "conclave");
 export const MEMPALACE = join(home, ".local/bin/mempalace");
 // Own palace file: `mempalace mine` never drops old chunks of an edited note,
 // so the shared palace.db fills with duplicates. A full rebuild takes ~3s.
@@ -65,4 +66,28 @@ export async function rebuild(): Promise<void> {
   // ponytail: a reader mid-swap gets one failed search, fine for a CLI lookup
   for (const suffix of ["-wal", "-shm"]) rmSync(PALACE + suffix, { force: true });
   renameSync(next, PALACE);
+}
+
+export const today = () => new Date().toLocaleDateString("sv-SE");
+const daily = (date: string) => `[[daily/${date}|${date}]]`;
+
+export function newNote(date: string, summary: string, source: string, body: string): string {
+  return `_${daily(date)}_. ${summary.trim()}\n\nSource: ${source}\n\n${body.trim()}\n`;
+}
+
+export function withUpdate(note: string, date: string, source: string, body: string): string {
+  const update = `## Update ${daily(date)}\n\nSource: ${source}\n\n${body.trim()}\n\n`;
+  const related = note.search(/^## Related notes/m);
+  if (related === -1) return `${note.trimEnd()}\n\n${update.trimEnd()}\n`;
+  return note.slice(0, related) + update + note.slice(related);
+}
+
+export async function commit(message?: string): Promise<boolean> {
+  const git = (...args: string[]) => run("git", ["-C", REPO, "-c", "core.hooksPath=/dev/null", ...args]);
+  const { stdout } = await git("status", "--porcelain", "--", "conclave");
+  if (!stdout.trim()) return false;
+  const slugs = [...stdout.matchAll(/conclave\/(.+?)\.md/g)].map((match) => match[1]);
+  await git("add", "-A", "--", "conclave");
+  await git("commit", "-q", "-m", message ?? `conclave: update ${slugs.join(", ") || "notes"}`, "--", "conclave");
+  return true;
 }
