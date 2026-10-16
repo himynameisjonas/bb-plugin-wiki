@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { format, indexContent, lint, lintReport, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
+import { format, indexContent, lint, lintReport, unsavedThreads, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -131,4 +131,11 @@ test("lint finds orphans, broken links and notes without Related notes", () => {
   ];
   assert.deepEqual(lint(docs), { orphans: ["a"], broken: [{ slug: "b", target: "gone" }], noRelated: ["b"] });
   assert.ok(lintReport(lint(docs)).startsWith("Orphans (no other note links to them): 1\n- [[a]]\n"));
+});
+
+test("unsavedThreads keeps recent threads no note links to", () => {
+  const row = (id: string, createdAt: number, originPluginId: string | null = null) => ({ id, title: id, createdAt, originPluginId });
+  const threads = [row("thr_old", 1), row("thr_saved", 10), row("thr_auto", 10, "automations"), row("thr_a", 10), row("thr_b", 20)];
+  const docs = [{ text: "Source: [x](http://host/threads/thr_saved)" }];
+  assert.deepEqual(unsavedThreads(threads, docs, 5).map((thread) => thread.id), ["thr_b", "thr_a"]);
 });

@@ -28,6 +28,8 @@ import {
   search,
   summary,
   today,
+  unsavedReport,
+  unsavedThreads,
   withUpdate,
 } from "./notebook.ts";
 
@@ -166,10 +168,18 @@ export default async function plugin(bb: BbPluginApi) {
   bb.cli.register({
     name: "conclave",
     summary: "Check the conclave notebook",
-    commands: [{ name: "lint", summary: "List orphan notes, broken [[links]] and notes without ## Related notes", usage: "bb conclave lint" }],
-    run([command]) {
-      if (command !== "lint") return { exitCode: 1, stderr: "Usage: bb conclave lint\n" };
-      return { exitCode: 0, stdout: lintReport(lint(readNotes())) };
+    commands: [
+      { name: "lint", summary: "List orphan notes, broken [[links]] and notes without ## Related notes", usage: "bb conclave lint" },
+      { name: "unsaved", summary: "List threads from the last days (default 7) that no note links to", usage: "bb conclave unsaved [days]" },
+    ],
+    async run([command, days = "7"]) {
+      if (command === "lint") return { exitCode: 0, stdout: lintReport(lint(readNotes())) };
+      if (command === "unsaved" && Number(days) > 0) {
+        const lists = await Promise.all([false, true].map((archived) => bb.sdk.threads.list({ archived, limit: 1000 })));
+        const since = Date.now() - Number(days) * 86_400_000;
+        return { exitCode: 0, stdout: unsavedReport(unsavedThreads(lists.flat(), readNotes(), since)) };
+      }
+      return { exitCode: 1, stderr: "Usage: bb conclave lint | bb conclave unsaved [days]\n" };
     },
   });
 

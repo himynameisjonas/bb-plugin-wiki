@@ -257,3 +257,18 @@ export function writeIndex(): boolean {
   writeFileSync(path, next);
   return true;
 }
+
+export type ThreadRow = { id: string; title: string | null; titleFallback?: string | null; createdAt: number; originPluginId: string | null };
+
+// Threads that no note links to. Agent-mode automation threads are skipped here; script-spawned ones carry no origin, so the compile prompt skips those by title.
+export function unsavedThreads(threads: ThreadRow[], docs: { text: string }[], since: number): ThreadRow[] {
+  const saved = new Set(docs.flatMap((doc) => doc.text.match(/thr_[a-z0-9]+/g) ?? []));
+  return threads
+    .filter((thread) => thread.createdAt >= since && thread.originPluginId !== "automations" && !saved.has(thread.id))
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export const unsavedReport = (threads: ThreadRow[]) =>
+  threads
+    .map((thread) => `- ${thread.id} (${new Date(thread.createdAt).toLocaleDateString("sv-SE")}): ${thread.title ?? thread.titleFallback ?? ""}\n`)
+    .join("");
