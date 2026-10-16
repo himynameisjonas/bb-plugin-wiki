@@ -23,6 +23,7 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   sync().catch(() => {});
+  bb.events.on("thread.idle", () => sync().catch(() => {}));
 
   bb.agents.registerTool({
     name: "conclave_search",
