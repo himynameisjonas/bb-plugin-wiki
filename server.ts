@@ -13,11 +13,14 @@ import {
   type Hit,
   commit,
   isStale,
+  lint,
+  lintReport,
   listNotes,
   matchNotes,
   newNote,
   notesLinking,
   pickRelated,
+  readNotes,
   wrapUpMessage,
   writeIndex,
   rebuild,
@@ -156,6 +159,16 @@ export default async function plugin(bb: BbPluginApi) {
   });
   bb.events.on("thread.archived", ({ thread }) => void related.delete(thread.id));
   bb.events.on("thread.deleted", ({ thread }) => void related.delete(thread.id));
+
+  bb.cli.register({
+    name: "conclave",
+    summary: "Check the conclave notebook",
+    commands: [{ name: "lint", summary: "List orphan notes, broken [[links]] and notes without ## Related notes", usage: "bb conclave lint" }],
+    run([command]) {
+      if (command !== "lint") return { exitCode: 1, stderr: "Usage: bb conclave lint\n" };
+      return { exitCode: 0, stdout: lintReport(lint(readNotes())) };
+    },
+  });
 
   bb.ui.registerMentionProvider({
     id: "note",

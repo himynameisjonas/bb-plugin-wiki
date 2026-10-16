@@ -71,11 +71,46 @@ export function rankNotes(docs: { slug: string; text: string }[], query: string,
     .slice(0, limit);
 }
 
-function wordSearch(query: string, limit: number): Hit[] {
-  const docs = readdirSync(paths.notes)
+export function readNotes(): { slug: string; text: string }[] {
+  return readdirSync(paths.notes)
     .filter((file) => file.endsWith(".md") && file !== `${INDEX}.md`)
     .map((file) => ({ slug: file.slice(0, -3), text: readFileSync(join(paths.notes, file), "utf8") }));
-  return rankNotes(docs, query.slice(0, 500), limit);
+}
+
+function wordSearch(query: string, limit: number): Hit[] {
+  return rankNotes(readNotes(), query.slice(0, 500), limit);
+}
+
+export type Lint = { orphans: string[]; broken: { slug: string; target: string }[]; noRelated: string[] };
+
+export function lint(docs: { slug: string; text: string }[]): Lint {
+  const slugs = new Set(docs.map((doc) => doc.slug));
+  const linked = new Set<string>();
+  const broken: Lint["broken"] = [];
+  for (const doc of docs) {
+    const text = doc.text.replace(/```[\s\S]*?```|`[^`\n]*`/g, "");
+    for (const [, raw] of text.matchAll(/\[\[([^\]|#]+)/g)) {
+      const target = raw.trim();
+      if (target.startsWith("daily/")) continue;
+      if (!slugs.has(target)) broken.push({ slug: doc.slug, target });
+      else if (target !== doc.slug) linked.add(target);
+    }
+  }
+  const sorted = (list: string[]) => list.sort((a, b) => a.localeCompare(b));
+  return {
+    orphans: sorted([...slugs].filter((slug) => !linked.has(slug))),
+    broken,
+    noRelated: sorted(docs.filter((doc) => !/^## Related notes/m.test(doc.text)).map((doc) => doc.slug)),
+  };
+}
+
+export function lintReport({ orphans, broken, noRelated }: Lint): string {
+  const section = (title: string, lines: string[]) => `${title}: ${lines.length}\n${lines.map((line) => `- ${line}\n`).join("")}`;
+  return [
+    section("Orphans (no other note links to them)", orphans.map((slug) => `[[${slug}]]`)),
+    section("Broken links", broken.map(({ slug, target }) => `[[${slug}]] links to [[${target}]]`)),
+    section("Notes without ## Related notes", noRelated.map((slug) => `[[${slug}]]`)),
+  ].join("\n");
 }
 
 export async function search(query: string, limit = 5): Promise<Hit[]> {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { format, indexContent, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
+import { format, indexContent, lint, lintReport, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -122,4 +122,13 @@ test("rankNotes ranks the note that matches the query best first", () => {
   assert.equal(hits[0].text, "Static membership avoids rebalances on deploys.");
   assert.ok(!hits.some((hit) => hit.slug === "trainz"));
   assert.deepEqual(rankNotes(docs, "nothing here matches", 5), []);
+});
+
+test("lint finds orphans, broken links and notes without Related notes", () => {
+  const docs = [
+    { slug: "a", text: "See [[b|the b note]] and [[daily/2026-10-16|2026-10-16]].\n\n## Related notes\n\n- [[a]]\n" },
+    { slug: "b", text: "Links to [[gone]]. Code: `[[not-a-link]]`\n\n```\n[[also-not]]\n```\n" },
+  ];
+  assert.deepEqual(lint(docs), { orphans: ["a"], broken: [{ slug: "b", target: "gone" }], noRelated: ["b"] });
+  assert.ok(lintReport(lint(docs)).startsWith("Orphans (no other note links to them): 1\n- [[a]]\n"));
 });
