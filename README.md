@@ -5,6 +5,8 @@ Connects BB threads to the conclave notebook in `~/Documents/Notes/conclave`.
 - `conclave_search` and `conclave_save` agent tools. Save adds the date line and a link back to the thread.
 - On a thread's first message, the agent gets up to three notes that may relate to it.
 - When a thread goes idle, changed notes are committed (`conclave: ...`) and the search index is rebuilt.
+- `bb conclave lint` lists orphan notes, broken `[[links]]` and notes without `## Related notes`. The notes panel shows the counts.
+- `bb conclave unsaved [days]` lists threads from the last days (default 7) that no note links to.
 
 The index lives in its own file, `~/.local/share/mempalace/conclave.db`, rebuilt from scratch on change. `mempalace mine` never drops the old chunks of an edited note, so mining into the shared `palace.db` piles up duplicates.
 
