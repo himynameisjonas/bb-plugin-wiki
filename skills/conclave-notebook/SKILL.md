@@ -37,5 +37,6 @@ Don't edit `index.md`. The plugin writes it.
 - Rare recipes: debugging, deploys, recovery.
 - Decisions and why: "we picked X over Y because Z".
 - Patterns seen across several incidents.
+- An answer that combines two or more notes into something new, such as a comparison, a decision or a pattern. Save it as a note that links its sources with `[[slug]]`. A plain lookup of one note is not a new note.
 
 Don't write what the codebase already says, or short-lived chat context and to-do lists.
