@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { indexContent, matchNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
+import { format, indexContent, matchNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -96,4 +96,17 @@ test("indexContent lists notes alphabetically with summaries", () => {
 test("shorten cuts at a word and adds an ellipsis", () => {
   assert.equal(shorten("short", 10), "short");
   assert.equal(shorten("part of the Turbo foundation work", 20), "part of the Turbo…");
+});
+
+test("the date line follows the date style", () => {
+  try {
+    format.dateStyle = "plain";
+    assert.ok(newNote("2026-10-16", "Why X.", "s", "b").startsWith("_2026-10-16_. Why X.\n"));
+    assert.ok(withUpdate("Intro\n", "2026-10-16", "s", "b").includes("## Update 2026-10-16\n"));
+    format.dateStyle = "none";
+    assert.ok(newNote("2026-10-16", "Why X.", "s", "b").startsWith("Why X.\n"));
+    assert.ok(withUpdate("Intro\n", "2026-10-16", "s", "b").includes("## Update\n"));
+  } finally {
+    format.dateStyle = "obsidian-daily";
+  }
 });

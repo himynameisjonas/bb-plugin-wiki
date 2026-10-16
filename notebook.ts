@@ -59,7 +59,7 @@ export function shorten(text: string, max: number): string {
 export function summary(slug: string): string {
   try {
     const first = readFileSync(join(paths.notes, `${slug}.md`), "utf8").split("\n").find((line) => line.trim()) ?? "";
-    return shorten(first.replace(/^_\[\[daily\/[^\]]*\]\]_\.?\s*/, "").replace(/^#\s*/, ""), 200);
+    return shorten(first.replace(/^_(\[\[daily\/[^\]]*\]\]|\d{4}-\d{2}-\d{2})_\.?\s*/, "").replace(/^#\s*/, ""), 200);
   } catch {
     return "";
   }
@@ -89,14 +89,19 @@ export async function rebuild(): Promise<void> {
 }
 
 export const today = () => new Date().toLocaleDateString("sv-SE");
-const daily = (date: string) => `[[daily/${date}|${date}]]`;
+export const DATE_STYLES = ["obsidian-daily", "plain", "none"] as const;
+export type DateStyle = (typeof DATE_STYLES)[number];
+export const format = { dateStyle: "obsidian-daily" as DateStyle };
+const mark = (date: string) => (format.dateStyle === "obsidian-daily" ? `[[daily/${date}|${date}]]` : date);
 
 export function newNote(date: string, summary: string, source: string, body: string): string {
-  return `_${daily(date)}_. ${summary.trim()}\n\nSource: ${source}\n\n${body.trim()}\n`;
+  const first = format.dateStyle === "none" ? summary.trim() : `_${mark(date)}_. ${summary.trim()}`;
+  return `${first}\n\nSource: ${source}\n\n${body.trim()}\n`;
 }
 
 export function withUpdate(note: string, date: string, source: string, body: string): string {
-  const update = `## Update ${daily(date)}\n\nSource: ${source}\n\n${body.trim()}\n\n`;
+  const heading = format.dateStyle === "none" ? "## Update" : `## Update ${mark(date)}`;
+  const update = `${heading}\n\nSource: ${source}\n\n${body.trim()}\n\n`;
   const related = note.search(/^## Related notes/m);
   if (related === -1) return `${note.trimEnd()}\n\n${update.trimEnd()}\n`;
   return note.slice(0, related) + update + note.slice(related);

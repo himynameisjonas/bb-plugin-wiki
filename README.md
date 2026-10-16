@@ -22,5 +22,6 @@ Change them under Settings → Installed plugins → Conclave, or with `bb plugi
 | `notes` | `~/Documents/Notes/conclave` | Folder with the Markdown notes. It can be a git repo root or a folder inside one. Without git, the plugin still indexes but doesn't commit. |
 | `mempalace` | `~/.local/bin/mempalace` | The [mempalace](https://github.com/bunkerlab-net/mempalace) binary, used for search. |
 | `palace` | `~/.local/share/mempalace/conclave.db` | Search index file. The plugin rebuilds it from scratch when notes change. |
+| `dateStyle` | `obsidian-daily` | Date line on new notes and updates: `obsidian-daily` (`[[daily/YYYY-MM-DD\|YYYY-MM-DD]]`), `plain`, or `none`. |
 
 The notes must be on the same machine as the BB server.

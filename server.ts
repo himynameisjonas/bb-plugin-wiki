@@ -3,9 +3,11 @@ import { z } from "zod";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  DATE_STYLES,
   DEFAULTS,
   configure,
   paths,
+  format,
   noteLink,
   type Hit,
   commit,
@@ -51,9 +53,17 @@ export default async function plugin(bb: BbPluginApi) {
     notes: { type: "string", label: "Notes folder", description: "Folder with the Markdown notes. ~ is your home folder.", default: DEFAULTS.notes },
     mempalace: { type: "string", label: "mempalace binary", description: "Path to the mempalace binary, used for search.", default: DEFAULTS.mempalace },
     palace: { type: "string", label: "Search index file", description: "The plugin rebuilds this file from the notes.", default: DEFAULTS.palace },
+    dateStyle: {
+      type: "select",
+      label: "Date line",
+      description: "How new notes and updates show the date. obsidian-daily links to daily/YYYY-MM-DD.",
+      options: [...DATE_STYLES],
+      default: "obsidian-daily",
+    },
   });
-  const apply = (values: typeof DEFAULTS) => {
+  const apply = (values: typeof DEFAULTS & { dateStyle: string }) => {
     configure(values);
+    format.dateStyle = DATE_STYLES.find((style) => style === values.dateStyle) ?? "obsidian-daily";
     const missing = [
       !existsSync(paths.notes) && `the notes folder ${paths.notes}`,
       !existsSync(paths.mempalace) && `mempalace at ${paths.mempalace}`,
