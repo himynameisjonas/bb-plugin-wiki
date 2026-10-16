@@ -13,6 +13,7 @@ import {
   newNote,
   notesLinking,
   pickRelated,
+  wrapUpMessage,
   rebuild,
   relatedNotes,
   search,
@@ -37,7 +38,7 @@ export const rpcContract = defineRpcContract({
 
 const WRAP_UP = [
   "Wrap-up before archiving: save what a future agent needs from this thread to conclave with conclave_save.",
-  "Search first and update a matching note instead of creating a new one.",
+  "Prefer updating an existing note over creating a new one. Run conclave_search too if the notes below don't cover it.",
   "If nothing here is worth keeping, save nothing and say so.",
   "Reply with one line naming the note. BB archives this thread when you finish.",
 ].join(" ");
@@ -88,28 +89,35 @@ export default async function plugin(bb: BbPluginApi) {
     }
     return { action: "proceed" };
   });
+  const notesFor = async (threadId: string) => {
+    const linked = notesLinking(threadId);
+    let hits = related.get(threadId);
+    if (!hits?.length) {
+      const thread = await bb.sdk.threads.get({ threadId });
+      const title = thread.title ?? thread.titleFallback;
+      hits = title ? await search(title, 8) : [];
+    }
+    return { linked, related: pickRelated(hits).map((hit) => hit.slug).filter((slug) => !linked.includes(slug)) };
+  };
+
   bb.agents.contributeInstructions(({ threadId }) => relatedNotes(related.get(threadId) ?? [], summary));
 
   bb.rpc.register(rpcContract, {
     async save_and_archive({ threadId }) {
+      const { linked, related } = await notesFor(threadId);
       await bb.storage.kv.set(archiveKey(threadId), "queued");
-      await bb.sdk.threads.send({ threadId, input: [{ type: "text", text: WRAP_UP, mentions: [] }], mode: "queue-if-active" });
+      const text = wrapUpMessage(WRAP_UP, linked, related);
+      await bb.sdk.threads.send({ threadId, input: [{ type: "text", text, mentions: [] }], mode: "queue-if-active" });
       return { queued: true };
     },
     async thread_notes({ threadId }) {
-      const linked = notesLinking(threadId);
-      let hits = related.get(threadId);
-      if (!hits?.length) {
-        const thread = await bb.sdk.threads.get({ threadId });
-        const title = thread.title ?? thread.titleFallback;
-        hits = title ? await search(title, 8) : [];
-      }
+      const { linked, related } = await notesFor(threadId);
       const note = (slug: string) => ({ slug, summary: summary(slug) });
       return {
         hostId: (await bb.sdk.system.config()).primaryHostId,
         notesDir: NOTES,
         linked: linked.map(note),
-        related: pickRelated(hits).filter((hit) => !linked.includes(hit.slug)).map((hit) => note(hit.slug)),
+        related: related.map(note),
       };
     },
   });

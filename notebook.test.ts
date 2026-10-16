@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matchNotes, newNote, noteLink, parseHits, relatedNotes, withUpdate } from "./notebook.ts";
+import { matchNotes, newNote, noteLink, parseHits, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -75,4 +75,11 @@ test("matchNotes needs every word in the slug or summary", () => {
   ];
   assert.deepEqual(matchNotes(notes, "pip log").map((note) => note.slug), ["pippi-health-log"]);
   assert.deepEqual(matchNotes(notes, "").length, 2);
+});
+
+test("wrapUpMessage lists existing notes before related ones", () => {
+  const message = wrapUpMessage("Lead.", ["mine"], ["near"]);
+  assert.ok(message.startsWith("Lead.\n\nNotes this thread already wrote."));
+  assert.ok(message.indexOf(noteLink("mine")) < message.indexOf(noteLink("near")));
+  assert.equal(wrapUpMessage("Lead.", [], []), "Lead.");
 });

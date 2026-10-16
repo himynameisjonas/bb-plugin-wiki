@@ -134,3 +134,11 @@ export function notesLinking(threadId: string): string[] {
     .filter((file) => file.endsWith(".md") && readFileSync(join(NOTES, file), "utf8").includes(threadId))
     .map((file) => file.slice(0, -3));
 }
+
+export function wrapUpMessage(lead: string, linked: string[], related: string[]): string {
+  const list = (slugs: string[]) => slugs.map((slug) => `- ${noteLink(slug)}`).join("\n");
+  const parts = [lead];
+  if (linked.length) parts.push(`Notes this thread already wrote. Update these with mode=update, or edit the stale parts:\n${list(linked)}`);
+  if (related.length) parts.push(`Notes that may cover the same topic. Read them and update one if it fits:\n${list(related)}`);
+  return parts.join("\n\n");
+}
