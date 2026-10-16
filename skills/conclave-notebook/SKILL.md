@@ -21,7 +21,8 @@ Save without being asked when the thread learned something durable. Tell the use
 
 1. Search first. If a note covers the topic, use `conclave_save` with `mode=update`, or edit the stale part of the file. Create a new note only for a new topic.
 2. For a new note, use `mode=create` with a kebab-case slug of three to six words and no date in it. Give a one-line summary. Start the body with a `# Heading` and end it with a `## Related notes` list.
-3. `conclave_save` adds the date line and a link to this thread, then commits and reindexes. If you edit a file directly, the plugin commits and reindexes when the thread goes idle.
+3. When the note summarizes a link the user pasted (a Slack thread, gist or article), pass it as `sourceUrl`. The note then keeps the source.
+4. `conclave_save` adds the date line and a link to this thread, then commits and reindexes. If you edit a file directly, the plugin commits and reindexes when the thread goes idle.
 
 Don't edit `index.md`. The plugin writes it.
 

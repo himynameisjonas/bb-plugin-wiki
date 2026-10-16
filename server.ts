@@ -198,17 +198,18 @@ export default async function plugin(bb: BbPluginApi) {
     description:
       "Write to the user's conclave notebook. mode=create makes a new note; mode=update adds a dated update section to an existing note. Adds the date line and a link to this thread, commits the notes repo and reindexes search.",
     instructions:
-      "When this thread learns something a future agent needs (hard-won reasoning, a rare recipe, a decision and why), save it with conclave_save without being asked. Search first and update the matching note instead of creating a parallel one. Tell the user the slug.",
+      "When this thread learns something a future agent needs (hard-won reasoning, a rare recipe, a decision and why), save it with conclave_save without being asked. Search first and update the matching note instead of creating a parallel one. When the note summarizes a link the user pasted (Slack thread, gist, article), pass it as sourceUrl so the source stays traceable. Tell the user the slug.",
     presentation: { label: { pending: "Saving to conclave", completed: "Saved to conclave" } },
     parameters: z.object({
       slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "kebab-case, no .md"),
       mode: z.enum(["create", "update"]),
       summary: z.string().max(300).optional().describe("One-line summary. Required for create."),
       body: z.string().min(1).describe("Markdown. For create, start with a # heading and end with ## Related notes."),
+      sourceUrl: z.string().url().optional().describe("Link the note is based on, such as a Slack thread, gist or article."),
     }),
-    async execute({ slug, mode, summary: line, body }, { threadId }) {
+    async execute({ slug, mode, summary: line, body, sourceUrl }, { threadId }) {
       const path = join(paths.notes, `${slug}.md`);
-      const source = await threadLink(threadId);
+      const source = (await threadLink(threadId)) + (sourceUrl ? `\nClipped from: <${sourceUrl}>` : "");
       if (mode === "create") {
         if (existsSync(path)) return { content: [{ type: "text", text: `[[${slug}]] exists. Use mode=update.` }], isError: true };
         if (!line) return { content: [{ type: "text", text: "summary is required for create." }], isError: true };
@@ -218,7 +219,7 @@ export default async function plugin(bb: BbPluginApi) {
         writeFileSync(path, withUpdate(readFileSync(path, "utf8"), today(), source, body));
       }
       await sync(`conclave: ${mode === "create" ? line : `update ${slug}`}`);
-      return `Saved ${noteLink(slug)}. Committed and reindexed.`;
+      return `Saved ${noteLink(slug)}.`;
     },
   });
 }
