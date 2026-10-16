@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matchNotes, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
+import { indexContent, matchNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -82,4 +82,18 @@ test("wrapUpMessage lists existing notes before related ones", () => {
   assert.ok(message.startsWith("Lead.\n\nNotes this thread already wrote."));
   assert.ok(message.indexOf(noteLink("mine")) < message.indexOf(noteLink("near")));
   assert.equal(wrapUpMessage("Lead.", [], []), "Lead.");
+});
+
+test("indexContent lists notes alphabetically with summaries", () => {
+  const index = indexContent([
+    { slug: "trainz", summary: "The train game" },
+    { slug: "aws-ses", summary: "" },
+  ]);
+  assert.ok(index.startsWith("# Index\n\n"));
+  assert.ok(index.endsWith("- [[aws-ses]]\n- [[trainz]]: The train game\n"));
+});
+
+test("shorten cuts at a word and adds an ellipsis", () => {
+  assert.equal(shorten("short", 10), "short");
+  assert.equal(shorten("part of the Turbo foundation work", 20), "part of the Turbo…");
 });

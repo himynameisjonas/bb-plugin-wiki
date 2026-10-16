@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -19,6 +19,8 @@ export function configure(next: Paths) {
   for (const key of Object.keys(DEFAULTS) as (keyof Paths)[]) paths[key] = expand(next[key] || DEFAULTS[key]);
 }
 configure(DEFAULTS);
+
+export const INDEX = "index";
 
 export type Hit = { slug: string; score: number; text: string };
 
@@ -45,13 +47,19 @@ export async function search(query: string, limit = 5): Promise<Hit[]> {
     ["--palace", paths.palace, "search", "--wing", "conclave", "--results", String(limit * 3), "--", query.slice(0, 500)],
     { timeout: 5000, maxBuffer: 4 * 1024 * 1024 },
   );
-  return parseHits(stdout).slice(0, limit);
+  return parseHits(stdout).filter((hit) => hit.slug !== INDEX).slice(0, limit);
+}
+
+export function shorten(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  return `${cut.slice(0, cut.lastIndexOf(" ") > 0 ? cut.lastIndexOf(" ") : max).replace(/[\s,.;:]+$/, "")}…`;
 }
 
 export function summary(slug: string): string {
   try {
     const first = readFileSync(join(paths.notes, `${slug}.md`), "utf8").split("\n").find((line) => line.trim()) ?? "";
-    return first.replace(/^_\[\[daily\/[^\]]*\]\]_\.?\s*/, "").replace(/^#\s*/, "").slice(0, 200);
+    return shorten(first.replace(/^_\[\[daily\/[^\]]*\]\]_\.?\s*/, "").replace(/^#\s*/, ""), 200);
   } catch {
     return "";
   }
@@ -104,9 +112,9 @@ export async function commit(message?: string): Promise<boolean> {
     return false;
   }
   if (!status.trim()) return false;
-  const slugs = [...status.matchAll(/([^/\s"]+)\.md"?$/gm)].map((match) => match[1]);
+  const slugs = [...status.matchAll(/([^/\s"]+)\.md"?$/gm)].map((match) => match[1]).filter((slug) => slug !== INDEX);
   await git("add", "-A", "--", ".");
-  await git("commit", "-q", "-m", message ?? `conclave: update ${slugs.join(", ") || "notes"}`, "--", ".");
+  await git("commit", "-q", "-m", message ?? `conclave: update ${slugs.join(", ") || "index"}`, "--", ".");
   return true;
 }
 
@@ -128,7 +136,7 @@ export function relatedNotes(hits: Hit[], describe: (slug: string) => string): s
 
 export function listNotes(): { slug: string; summary: string }[] {
   return readdirSync(paths.notes)
-    .filter((file) => file.endsWith(".md"))
+    .filter((file) => file.endsWith(".md") && file !== `${INDEX}.md`)
     .map((file) => ({ file, mtime: statSync(join(paths.notes, file)).mtimeMs }))
     .sort((a, b) => b.mtime - a.mtime)
     .map(({ file }) => {
@@ -154,4 +162,20 @@ export function wrapUpMessage(lead: string, linked: string[], related: string[])
   if (linked.length) parts.push(`Notes this thread already wrote. Update these with mode=update, or edit the stale parts:\n${list(linked)}`);
   if (related.length) parts.push(`Notes that may cover the same topic. Read them and update one if it fits:\n${list(related)}`);
   return parts.join("\n\n");
+}
+
+export function indexContent(notes: { slug: string; summary: string }[]): string {
+  const lines = [...notes]
+    .sort((a, b) => a.slug.localeCompare(b.slug))
+    .map((note) => `- [[${note.slug}]]${note.summary ? `: ${note.summary}` : ""}`);
+  return `# Index\n\nEvery note in this folder, one line each. The BB conclave plugin writes this file, so don't edit it.\n\n${lines.join("\n")}\n`;
+}
+
+// Only writes on change, so an unchanged notebook doesn't trigger a commit or an index rebuild.
+export function writeIndex(): boolean {
+  const path = join(paths.notes, `${INDEX}.md`);
+  const next = indexContent(listNotes());
+  if (existsSync(path) && readFileSync(path, "utf8") === next) return false;
+  writeFileSync(path, next);
+  return true;
 }

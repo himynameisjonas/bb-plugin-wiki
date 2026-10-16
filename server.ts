@@ -16,6 +16,7 @@ import {
   notesLinking,
   pickRelated,
   wrapUpMessage,
+  writeIndex,
   rebuild,
   relatedNotes,
   search,
@@ -64,6 +65,7 @@ export default async function plugin(bb: BbPluginApi) {
   const sync = (message?: string) => {
     const job = queue.then(async () => {
       if (!existsSync(paths.notes)) return;
+      writeIndex();
       await commit(message);
       if (isStale()) await rebuild();
     });
