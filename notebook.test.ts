@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matchNotes, newNote, noteLink, parseHits, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
+import { matchNotes, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -63,7 +63,7 @@ test("relatedNotes keeps up to three notes close to the top score", () => {
   const hits = [6, 5, 4, 3.9, 1].map((score, index) => ({ slug: `n${index}`, score, text: "" }));
   assert.equal(
     relatedNotes(hits, (slug) => `about ${slug}`),
-    `Notes in the user's conclave notebook (~/Documents/Notes/conclave) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:\n- ${noteLink("n0")}: about n0\n- ${noteLink("n1")}: about n1\n- ${noteLink("n2")}: about n2`,
+    `Notes in the user's conclave notebook (${paths.notes}) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:\n- ${noteLink("n0")}: about n0\n- ${noteLink("n1")}: about n1\n- ${noteLink("n2")}: about n2`,
   );
   assert.equal(relatedNotes([{ slug: "weak", score: 1.5, text: "" }], () => ""), null);
 });

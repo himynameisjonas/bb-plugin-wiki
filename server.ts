@@ -3,7 +3,9 @@ import { z } from "zod";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  NOTES,
+  DEFAULTS,
+  configure,
+  paths,
   noteLink,
   type Hit,
   commit,
@@ -44,9 +46,24 @@ const WRAP_UP = [
 ].join(" ");
 
 export default async function plugin(bb: BbPluginApi) {
+  const settings = bb.settings.define({
+    notes: { type: "string", label: "Notes folder", description: "Folder with the Markdown notes. ~ is your home folder.", default: DEFAULTS.notes },
+    mempalace: { type: "string", label: "mempalace binary", description: "Path to the mempalace binary, used for search.", default: DEFAULTS.mempalace },
+    palace: { type: "string", label: "Search index file", description: "The plugin rebuilds this file from the notes.", default: DEFAULTS.palace },
+  });
+  const apply = (values: typeof DEFAULTS) => {
+    configure(values);
+    const missing = [
+      !existsSync(paths.notes) && `the notes folder ${paths.notes}`,
+      !existsSync(paths.mempalace) && `mempalace at ${paths.mempalace}`,
+    ].filter(Boolean);
+    if (missing.length) bb.status.needsConfiguration(`Can't find ${missing.join(" or ")}. Fix the paths in the plugin settings, then run \`bb plugin reload conclave\`.`);
+  };
+  apply(await settings.get());
   let queue = Promise.resolve();
   const sync = (message?: string) => {
     const job = queue.then(async () => {
+      if (!existsSync(paths.notes)) return;
       await commit(message);
       if (isStale()) await rebuild();
     });
@@ -63,6 +80,10 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   sync().catch(() => {});
+  settings.onChange((next) => {
+    apply(next);
+    sync().catch(() => {});
+  });
   const archiveKey = (threadId: string) => `archive-after:${threadId}`;
   bb.events.on("thread.idle", async ({ thread }) => {
     await sync().catch(() => {});
@@ -115,7 +136,7 @@ export default async function plugin(bb: BbPluginApi) {
       const note = (slug: string) => ({ slug, summary: summary(slug) });
       return {
         hostId: (await bb.sdk.system.config()).primaryHostId,
-        notesDir: NOTES,
+        notesDir: paths.notes,
         linked: linked.map(note),
         related: related.map(note),
       };
@@ -134,7 +155,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     resolve(slug) {
       if (!/^[a-z0-9-]+$/.test(slug)) throw new Error(`Bad note id ${slug}`);
-      const path = join(NOTES, `${slug}.md`);
+      const path = join(paths.notes, `${slug}.md`);
       return { context: `Conclave note [[${slug}]] (${path}):\n\n${readFileSync(path, "utf8").slice(0, 30_000)}` };
     },
   });
@@ -142,7 +163,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "conclave_search",
     description:
-      "Search the user's conclave notebook (personal notes in ~/Documents/Notes/conclave) by keywords. BM25, so use words likely to appear in a note. Returns note slugs, one-line summaries and matching snippets.",
+      "Search the user's conclave notebook (personal Markdown notes) by keywords. BM25, so use words likely to appear in a note. Returns note slugs, one-line summaries and matching snippets.",
     instructions:
       "Use conclave_search before starting work that earlier notes might cover, and when the user asks what they know or wrote about something. In chat, cite notes as Markdown file links like [slug](/path/to/slug.md) so they are clickable. Inside notes, keep [[slug]].",
     presentation: { label: { pending: "Searching conclave", completed: "Searched conclave" } },
@@ -174,7 +195,7 @@ export default async function plugin(bb: BbPluginApi) {
       body: z.string().min(1).describe("Markdown. For create, start with a # heading and end with ## Related notes."),
     }),
     async execute({ slug, mode, summary: line, body }, { threadId }) {
-      const path = join(NOTES, `${slug}.md`);
+      const path = join(paths.notes, `${slug}.md`);
       const source = await threadLink(threadId);
       if (mode === "create") {
         if (existsSync(path)) return { content: [{ type: "text", text: `[[${slug}]] exists. Use mode=update.` }], isError: true };

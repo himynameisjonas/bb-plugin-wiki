@@ -1,23 +1,29 @@
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
-const home = homedir();
-
-export const REPO = join(home, "Documents/Notes");
-export const NOTES = join(REPO, "conclave");
-export const MEMPALACE = join(home, ".local/bin/mempalace");
-// Own palace file: `mempalace mine` never drops old chunks of an edited note,
-// so the shared palace.db fills with duplicates. A full rebuild takes ~3s.
-export const PALACE = join(home, ".local/share/mempalace/conclave.db");
+export const DEFAULTS = {
+  notes: "~/Documents/Notes/conclave",
+  mempalace: "~/.local/bin/mempalace",
+  // Own palace file: `mempalace mine` never drops old chunks of an edited note,
+  // so a shared palace.db fills with duplicates. A full rebuild takes ~3s.
+  palace: "~/.local/share/mempalace/conclave.db",
+};
+type Paths = typeof DEFAULTS;
+const expand = (path: string) => path.trim().replace(/^~(?=$|\/)/, homedir());
+export const paths: Paths = { notes: "", mempalace: "", palace: "" };
+export function configure(next: Paths) {
+  for (const key of Object.keys(DEFAULTS) as (keyof Paths)[]) paths[key] = expand(next[key] || DEFAULTS[key]);
+}
+configure(DEFAULTS);
 
 export type Hit = { slug: string; score: number; text: string };
 
 // A Markdown file link is clickable in BB chat and opens the note in the side panel; [[slug]] is not.
-export const noteLink = (slug: string) => `[${slug}](${join(NOTES, `${slug}.md`)})`;
+export const noteLink = (slug: string) => `[${slug}](${join(paths.notes, `${slug}.md`)})`;
 
 export function parseHits(output: string): Hit[] {
   const hits: Hit[] = [];
@@ -35,8 +41,8 @@ export function parseHits(output: string): Hit[] {
 
 export async function search(query: string, limit = 5): Promise<Hit[]> {
   const { stdout } = await run(
-    MEMPALACE,
-    ["--palace", PALACE, "search", "--wing", "conclave", "--results", String(limit * 3), "--", query.slice(0, 500)],
+    paths.mempalace,
+    ["--palace", paths.palace, "search", "--wing", "conclave", "--results", String(limit * 3), "--", query.slice(0, 500)],
     { timeout: 5000, maxBuffer: 4 * 1024 * 1024 },
   );
   return parseHits(stdout).slice(0, limit);
@@ -44,7 +50,7 @@ export async function search(query: string, limit = 5): Promise<Hit[]> {
 
 export function summary(slug: string): string {
   try {
-    const first = readFileSync(join(NOTES, `${slug}.md`), "utf8").split("\n").find((line) => line.trim()) ?? "";
+    const first = readFileSync(join(paths.notes, `${slug}.md`), "utf8").split("\n").find((line) => line.trim()) ?? "";
     return first.replace(/^_\[\[daily\/[^\]]*\]\]_\.?\s*/, "").replace(/^#\s*/, "").slice(0, 200);
   } catch {
     return "";
@@ -54,22 +60,23 @@ export function summary(slug: string): string {
 export function isStale(): boolean {
   let built: number;
   try {
-    built = statSync(PALACE).mtimeMs;
+    built = statSync(paths.palace).mtimeMs;
   } catch {
     return true;
   }
-  if (statSync(NOTES).mtimeMs > built) return true;
-  return readdirSync(NOTES).some((file) => file.endsWith(".md") && statSync(join(NOTES, file)).mtimeMs > built);
+  if (statSync(paths.notes).mtimeMs > built) return true;
+  return readdirSync(paths.notes).some((file) => file.endsWith(".md") && statSync(join(paths.notes, file)).mtimeMs > built);
 }
 
 export async function rebuild(): Promise<void> {
-  const next = `${PALACE}.next`;
+  const next = `${paths.palace}.next`;
+  mkdirSync(dirname(paths.palace), { recursive: true });
   for (const suffix of ["", "-wal", "-shm"]) rmSync(next + suffix, { force: true });
-  await run(MEMPALACE, ["--palace", next, "mine", "--wing", "conclave", NOTES], { timeout: 60_000 });
+  await run(paths.mempalace, ["--palace", next, "mine", "--wing", "conclave", paths.notes], { timeout: 60_000 });
   // ponytail: a reader mid-swap gets one odd search, fine for a CLI lookup
-  for (const suffix of ["-wal", "-shm"]) rmSync(PALACE + suffix, { force: true });
-  renameSync(next, PALACE);
-  if (existsSync(`${next}-wal`)) renameSync(`${next}-wal`, `${PALACE}-wal`);
+  for (const suffix of ["-wal", "-shm"]) rmSync(paths.palace + suffix, { force: true });
+  renameSync(next, paths.palace);
+  if (existsSync(`${next}-wal`)) renameSync(`${next}-wal`, `${paths.palace}-wal`);
   rmSync(`${next}-shm`, { force: true });
 }
 
@@ -87,13 +94,19 @@ export function withUpdate(note: string, date: string, source: string, body: str
   return note.slice(0, related) + update + note.slice(related);
 }
 
+// Works when the notes folder is the repo root or a folder inside it. No repo means no commits.
 export async function commit(message?: string): Promise<boolean> {
-  const git = (...args: string[]) => run("git", ["-C", REPO, "-c", "core.hooksPath=/dev/null", ...args]);
-  const { stdout } = await git("status", "--porcelain", "--", "conclave");
-  if (!stdout.trim()) return false;
-  const slugs = [...stdout.matchAll(/conclave\/(.+?)\.md/g)].map((match) => match[1]);
-  await git("add", "-A", "--", "conclave");
-  await git("commit", "-q", "-m", message ?? `conclave: update ${slugs.join(", ") || "notes"}`, "--", "conclave");
+  const git = (...args: string[]) => run("git", ["-C", paths.notes, "-c", "core.hooksPath=/dev/null", ...args]);
+  let status: string;
+  try {
+    status = (await git("status", "--porcelain", "--", ".")).stdout;
+  } catch {
+    return false;
+  }
+  if (!status.trim()) return false;
+  const slugs = [...status.matchAll(/([^/\s"]+)\.md"?$/gm)].map((match) => match[1]);
+  await git("add", "-A", "--", ".");
+  await git("commit", "-q", "-m", message ?? `conclave: update ${slugs.join(", ") || "notes"}`, "--", ".");
   return true;
 }
 
@@ -108,15 +121,15 @@ export function relatedNotes(hits: Hit[], describe: (slug: string) => string): s
   if (picked.length === 0) return null;
   const lines = picked.map((hit) => `- ${noteLink(hit.slug)}: ${describe(hit.slug)}`);
   return [
-    "Notes in the user's conclave notebook (~/Documents/Notes/conclave) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:",
+    `Notes in the user's conclave notebook (${paths.notes}) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:`,
     ...lines,
   ].join("\n");
 }
 
 export function listNotes(): { slug: string; summary: string }[] {
-  return readdirSync(NOTES)
+  return readdirSync(paths.notes)
     .filter((file) => file.endsWith(".md"))
-    .map((file) => ({ file, mtime: statSync(join(NOTES, file)).mtimeMs }))
+    .map((file) => ({ file, mtime: statSync(join(paths.notes, file)).mtimeMs }))
     .sort((a, b) => b.mtime - a.mtime)
     .map(({ file }) => {
       const slug = file.slice(0, -3);
@@ -130,8 +143,8 @@ export function matchNotes<T extends { slug: string; summary: string }>(notes: T
 }
 
 export function notesLinking(threadId: string): string[] {
-  return readdirSync(NOTES)
-    .filter((file) => file.endsWith(".md") && readFileSync(join(NOTES, file), "utf8").includes(threadId))
+  return readdirSync(paths.notes)
+    .filter((file) => file.endsWith(".md") && readFileSync(join(paths.notes, file), "utf8").includes(threadId))
     .map((file) => file.slice(0, -3));
 }
 
