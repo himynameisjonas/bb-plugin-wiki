@@ -32,7 +32,15 @@ export type ThreadNotes = z.infer<typeof threadNotesSchema>;
 
 export const rpcContract = defineRpcContract({
   thread_notes: { input: z.object({ threadId: z.string() }), output: threadNotesSchema },
+  save_and_archive: { input: z.object({ threadId: z.string() }), output: z.object({ queued: z.boolean() }) },
 });
+
+const WRAP_UP = [
+  "Wrap-up before archiving: save what a future agent needs from this thread to conclave with conclave_save.",
+  "Search first and update a matching note instead of creating a new one.",
+  "If nothing here is worth keeping, save nothing and say so.",
+  "Reply with one line naming the note. BB archives this thread when you finish.",
+].join(" ");
 
 export default async function plugin(bb: BbPluginApi) {
   let queue = Promise.resolve();
@@ -54,11 +62,22 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   sync().catch(() => {});
-  bb.events.on("thread.idle", () => sync().catch(() => {}));
+  const archiveKey = (threadId: string) => `archive-after:${threadId}`;
+  bb.events.on("thread.idle", async ({ thread }) => {
+    await sync().catch(() => {});
+    // "queued" means a busy thread went idle before the wrap-up turn ran
+    if ((await bb.storage.kv.get(archiveKey(thread.id))) !== "running") return;
+    await bb.storage.kv.delete(archiveKey(thread.id));
+    await bb.sdk.threads.archive({ threadId: thread.id });
+  });
+  bb.events.on("thread.failed", ({ thread }) => bb.storage.kv.delete(archiveKey(thread.id)));
 
   // ponytail: in memory, so a server restart loses hints for threads already running
   const related = new Map<string, Hit[]>();
   bb.experimental_hooks.on("message.dispatch", async (ctx) => {
+    if (ctx.input.text.includes(WRAP_UP) && (await bb.storage.kv.get(archiveKey(ctx.thread.id)))) {
+      await bb.storage.kv.set(archiveKey(ctx.thread.id), "running");
+    }
     if (!related.has(ctx.thread.id) && ctx.input.text.trim()) {
       related.set(ctx.thread.id, []);
       try {
@@ -72,6 +91,11 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.contributeInstructions(({ threadId }) => relatedNotes(related.get(threadId) ?? [], summary));
 
   bb.rpc.register(rpcContract, {
+    async save_and_archive({ threadId }) {
+      await bb.storage.kv.set(archiveKey(threadId), "queued");
+      await bb.sdk.threads.send({ threadId, input: [{ type: "text", text: WRAP_UP, mentions: [] }], mode: "queue-if-active" });
+      return { queued: true };
+    },
     async thread_notes({ threadId }) {
       const linked = notesLinking(threadId);
       let hits = related.get(threadId);

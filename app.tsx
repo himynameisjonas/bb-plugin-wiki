@@ -1,4 +1,10 @@
-import { definePluginApp, experimental_FileLink as FileLink, UrlLink, useRpc } from "@get-bb/plugin-sdk/app";
+import {
+  definePluginApp,
+  experimental_FileLink as FileLink,
+  experimental_Icon as Icon,
+  UrlLink,
+  useRpc,
+} from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { ThreadNotes, rpcContract } from "./server.ts";
 
@@ -51,6 +57,38 @@ function ConclavePanel({ threadId }: { threadId: string }) {
   );
 }
 
+function SaveAndArchiveButton({ threadId }: { threadId: string }) {
+  const rpc = useRpc<typeof rpcContract>();
+  const [state, setState] = useState<"idle" | "sent" | "failed">("idle");
+  const label =
+    state === "sent"
+      ? "Saving to conclave. The thread archives when the agent is done."
+      : state === "failed"
+        ? "Could not start the wrap-up. Try again."
+        : "Save to conclave and archive";
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={state === "sent"}
+      className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+      onClick={() => {
+        setState("sent");
+        rpc.call("save_and_archive", { threadId }).catch(() => setState("failed"));
+      }}
+    >
+      <Icon name="conclave/icon" fallback="Archive" aria-hidden className="size-4" />
+    </button>
+  );
+}
+
 export default definePluginApp((app) => {
   app.slots.threadPanelAction({ id: "notes", title: "Conclave notes", component: ConclavePanel });
+  app.slots.experimental_threadHeaderAction({
+    id: "save-and-archive",
+    title: "Save to conclave and archive",
+    component: SaveAndArchiveButton,
+  });
 });

@@ -10,7 +10,10 @@
     "name": "Conclave",
     "description": "Search and write the conclave notebook from BB threads.",
     "branding": {
-      "icon": "./icon.svg"
+      "icon": "./icon.svg",
+      "experimental_icons": {
+        "icon": "./icon.svg"
+      }
     },
     "server": "./server.ts",
     "skills": [],
