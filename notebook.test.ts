@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { firstSection, format, indexContent, writeIndex, lint, lintReport, unsavedThreads, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
+import { withLinked, firstSection, format, indexContent, writeIndex, lint, lintReport, unsavedThreads, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -180,4 +180,24 @@ test("writeIndex with an empty name writes nothing and deletes the old index", (
   } finally {
     Object.assign(paths, saved);
   }
+});
+
+test("withLinked lifts notes linked to or from the top hit just below it", () => {
+  const docs = [
+    { slug: "top", text: "See [[out]] and [[daily/2026-10-17]] and `[[code]]`." },
+    { slug: "out", text: "" },
+    { slug: "in", text: "Back to [[top]]." },
+    { slug: "words", text: "" },
+    { slug: "code", text: "" },
+  ];
+  const hits = [
+    { slug: "top", score: 10, text: "" },
+    { slug: "words", score: 8, text: "" },
+    { slug: "in", score: 3, text: "" },
+  ];
+  assert.deepEqual(
+    withLinked(hits, docs).map((hit) => [hit.slug, hit.score]),
+    [["top", 10], ["in", 9], ["out", 9], ["words", 8]],
+  );
+  assert.deepEqual(withLinked([], docs), []);
 });

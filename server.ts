@@ -21,6 +21,7 @@ import {
   newNote,
   notesLinking,
   pickRelated,
+  withLinked,
   readNotes,
   wrapUpMessage,
   writeIndex,
@@ -126,7 +127,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (!related.has(ctx.thread.id) && ctx.input.text.trim()) {
       related.set(ctx.thread.id, []);
       try {
-        related.set(ctx.thread.id, await search(ctx.input.text, 8));
+        related.set(ctx.thread.id, withLinked(await search(ctx.input.text, 8), readNotes()));
       } catch (error) {
         bb.log.warn(`related notes failed: ${error}`);
       }
@@ -139,7 +140,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (!hits?.length) {
       const thread = await bb.sdk.threads.get({ threadId });
       const title = thread.title ?? thread.titleFallback;
-      hits = title ? await search(title, 8) : [];
+      hits = title ? withLinked(await search(title, 8), readNotes()) : [];
     }
     return { linked, related: pickRelated(hits).map((hit) => hit.slug).filter((slug) => !linked.includes(slug)) };
   };

@@ -82,6 +82,12 @@ function wordSearch(query: string, limit: number): Hit[] {
   return rankNotes(readNotes(), query.slice(0, 500), limit);
 }
 
+// [[slug]] targets outside code, without daily notes.
+export const linksIn = (text: string): string[] =>
+  [...text.replace(/```[\s\S]*?```|`[^`\n]*`/g, "").matchAll(/\[\[([^\]|#]+)/g)]
+    .map(([, raw]) => raw.trim())
+    .filter((target) => !target.startsWith("daily/"));
+
 export type Lint = { orphans: string[]; broken: { slug: string; target: string }[]; noRelated: string[] };
 
 export function lint(docs: { slug: string; text: string }[]): Lint {
@@ -89,10 +95,7 @@ export function lint(docs: { slug: string; text: string }[]): Lint {
   const linked = new Set<string>();
   const broken: Lint["broken"] = [];
   for (const doc of docs) {
-    const text = doc.text.replace(/```[\s\S]*?```|`[^`\n]*`/g, "");
-    for (const [, raw] of text.matchAll(/\[\[([^\]|#]+)/g)) {
-      const target = raw.trim();
-      if (target.startsWith("daily/")) continue;
+    for (const target of linksIn(doc.text)) {
       if (!slugs.has(target)) broken.push({ slug: doc.slug, target });
       else if (target !== doc.slug) linked.add(target);
     }
@@ -203,6 +206,20 @@ export async function commit(message?: string): Promise<boolean> {
   await git("add", "-A", "--", ".");
   await git("commit", "-q", "-m", message ?? `wiki: update ${slugs.join(", ") || "index"}`, "--", ".");
   return true;
+}
+
+// Links are a stronger sign than shared words, so notes linked to or from the top hit rank just below it.
+export function withLinked(hits: Hit[], docs: { slug: string; text: string }[]): Hit[] {
+  const top = hits[0];
+  if (!top) return hits;
+  const outgoing = linksIn(docs.find((doc) => doc.slug === top.slug)?.text ?? "");
+  const incoming = docs.filter((doc) => linksIn(doc.text).includes(top.slug)).map((doc) => doc.slug);
+  const known = new Set(docs.map((doc) => doc.slug));
+  const linked = new Set([...outgoing, ...incoming].filter((slug) => slug !== top.slug && known.has(slug)));
+  const score = top.score * 0.9;
+  const rest = hits.slice(1).map((hit) => (linked.has(hit.slug) ? { ...hit, score: Math.max(hit.score, score) } : hit));
+  const added = [...linked].filter((slug) => !hits.some((hit) => hit.slug === slug)).map((slug) => ({ slug, score, text: "" }));
+  return [top, ...[...rest, ...added].sort((a, b) => b.score - a.score)];
 }
 
 // ponytail: BM25 scores don't separate well, so this is a loose hint, not a verdict
