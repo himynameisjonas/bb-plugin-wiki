@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -161,16 +161,31 @@ export function isStale(): boolean {
   return readdirSync(paths.notes).some((file) => file.endsWith(".md") && statSync(join(paths.notes, file)).mtimeMs > built);
 }
 
+// During a plugin reload the old and the new server can both sync. Without the lock, one deletes
+// the other's half-mined file and a broken index gets swapped in. A skipped rebuild runs on the next sync.
 export async function rebuild(): Promise<void> {
   const next = `${paths.palace}.next`;
+  const lock = `${paths.palace}.lock`;
   mkdirSync(dirname(paths.palace), { recursive: true });
-  for (const suffix of ["", "-wal", "-shm"]) rmSync(next + suffix, { force: true });
-  await run(paths.mempalace, ["--palace", next, "mine", "--wing", "wiki", paths.notes], { timeout: 60_000 });
-  // ponytail: a reader mid-swap gets one odd search, fine for a CLI lookup
-  for (const suffix of ["-wal", "-shm"]) rmSync(paths.palace + suffix, { force: true });
-  renameSync(next, paths.palace);
-  if (existsSync(`${next}-wal`)) renameSync(`${next}-wal`, `${paths.palace}-wal`);
-  rmSync(`${next}-shm`, { force: true });
+  try {
+    if (Date.now() - statSync(lock).mtimeMs > 120_000) rmSync(lock);
+  } catch {}
+  try {
+    closeSync(openSync(lock, "wx"));
+  } catch {
+    return;
+  }
+  try {
+    for (const suffix of ["", "-wal", "-shm"]) rmSync(next + suffix, { force: true });
+    await run(paths.mempalace, ["--palace", next, "mine", "--wing", "wiki", paths.notes], { timeout: 60_000 });
+    // ponytail: a reader mid-swap gets one odd search, fine for a CLI lookup
+    for (const suffix of ["-wal", "-shm"]) rmSync(paths.palace + suffix, { force: true });
+    renameSync(next, paths.palace);
+    if (existsSync(`${next}-wal`)) renameSync(`${next}-wal`, `${paths.palace}-wal`);
+    rmSync(`${next}-shm`, { force: true });
+  } finally {
+    rmSync(lock, { force: true });
+  }
 }
 
 export const today = () => new Date().toLocaleDateString("sv-SE");

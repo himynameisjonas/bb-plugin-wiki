@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { withLinked, firstSection, format, indexContent, writeIndex, lint, lintReport, unsavedThreads, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
+import { rebuild, withLinked, firstSection, format, indexContent, writeIndex, lint, lintReport, unsavedThreads, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -200,4 +200,20 @@ test("withLinked lifts notes linked to or from the top hit just below it", () =>
     [["top", 10], ["in", 9], ["out", 9], ["words", 8]],
   );
   assert.deepEqual(withLinked([], docs), []);
+});
+
+test("rebuild skips while another process holds the lock", async () => {
+  const saved = { ...paths };
+  paths.palace = join(mkdtempSync(join(tmpdir(), "palace-")), "wiki.db");
+  paths.mempalace = "/nonexistent/mempalace";
+  writeFileSync(`${paths.palace}.lock`, "");
+  try {
+    await rebuild();
+    assert.ok(existsSync(`${paths.palace}.lock`));
+    rmSync(`${paths.palace}.lock`);
+    await assert.rejects(rebuild());
+    assert.equal(existsSync(`${paths.palace}.lock`), false);
+  } finally {
+    Object.assign(paths, saved);
+  }
 });
