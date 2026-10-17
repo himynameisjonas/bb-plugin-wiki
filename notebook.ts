@@ -11,7 +11,7 @@ export const DEFAULTS = {
   // Own palace file: `mempalace mine` never drops old chunks of an edited note,
   // so a shared palace.db fills with duplicates. A full rebuild takes ~3s.
   palace: "~/.local/share/mempalace/wiki.db",
-  index: "index",
+  index: "wiki",
 };
 type Paths = typeof DEFAULTS;
 const expand = (path: string) => path.trim().replace(/^~(?=$|\/)/, homedir());

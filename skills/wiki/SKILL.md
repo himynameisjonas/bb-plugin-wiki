@@ -13,7 +13,7 @@ The wiki is a folder of Markdown notes, one topic per note. The folder is set in
 2. Read the top two to four notes in full, not only the snippets.
 3. Answer from the notes. Cite each claim with a Markdown file link to the note, for example `[trainz](/path/to/notes/trainz.md)`. BB makes these clickable. A bare `[[slug]]` in chat is plain text.
 
-`index.md` in the notes folder lists every note with its one-line summary. Read it when you need an overview.
+`wiki.md` in the notes folder (the plugin's `index` setting) lists every note with its one-line summary. Read it when you need an overview.
 
 ## Write
 
@@ -24,7 +24,7 @@ Save without being asked when the thread learned something durable. Tell the use
 3. When the note summarizes a link the user pasted (a Slack thread, gist or article), pass it as `sourceUrl`. The note then keeps the source.
 4. `wiki_save` adds the date line and a link to this thread, then commits and reindexes. If you edit a file directly, the plugin commits and reindexes when the thread goes idle.
 
-Don't edit `index.md`. The plugin writes it.
+Don't edit `wiki.md`. The plugin writes it.
 
 ## Links inside notes
 
