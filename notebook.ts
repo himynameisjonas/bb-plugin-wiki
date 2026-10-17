@@ -242,11 +242,17 @@ export function wrapUpMessage(lead: string, linked: string[], related: string[])
   return parts.join("\n\n");
 }
 
+// Groups notes by the first part of the slug. A prefix with one note goes to "Other".
 export function indexContent(notes: { slug: string; summary: string }[]): string {
-  const lines = [...notes]
-    .sort((a, b) => a.slug.localeCompare(b.slug))
-    .map((note) => `- [[${note.slug}]]${note.summary ? `: ${note.summary}` : ""}`);
-  return `# Index\n\nEvery note in this folder, one line each. The BB wiki plugin writes this file, so don't edit it.\n\n${lines.join("\n")}\n`;
+  const groups = new Map<string, string[]>();
+  for (const note of [...notes].sort((a, b) => a.slug.localeCompare(b.slug))) {
+    const prefix = note.slug.split("-")[0];
+    groups.set(prefix, [...(groups.get(prefix) ?? []), `- [[${note.slug}]]${note.summary ? `: ${note.summary}` : ""}`]);
+  }
+  const other = [...groups.values()].filter((lines) => lines.length < 2).flat();
+  const sections = [...groups].filter(([, lines]) => lines.length > 1).map(([prefix, lines]) => `## ${prefix}\n\n${lines.join("\n")}`);
+  if (other.length) sections.push(`## Other\n\n${other.join("\n")}`);
+  return `# Index\n\nEvery note in this folder, one line each, grouped by the first part of the slug. The BB wiki plugin writes this file, so don't edit it.\n\n${sections.join("\n\n")}\n`;
 }
 
 // Only writes on change, so an unchanged notebook doesn't trigger a commit or an index rebuild.

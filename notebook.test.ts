@@ -84,13 +84,15 @@ test("wrapUpMessage lists existing notes before related ones", () => {
   assert.equal(wrapUpMessage("Lead.", [], []), "Lead.");
 });
 
-test("indexContent lists notes alphabetically with summaries", () => {
+test("indexContent groups notes by slug prefix, singletons under Other", () => {
   const index = indexContent([
     { slug: "trainz", summary: "The train game" },
+    { slug: "pippi-b", summary: "" },
     { slug: "aws-ses", summary: "" },
+    { slug: "pippi-a", summary: "First" },
   ]);
   assert.ok(index.startsWith("# Index\n\n"));
-  assert.ok(index.endsWith("- [[aws-ses]]\n- [[trainz]]: The train game\n"));
+  assert.ok(index.endsWith("## pippi\n\n- [[pippi-a]]: First\n- [[pippi-b]]\n\n## Other\n\n- [[aws-ses]]\n- [[trainz]]: The train game\n"));
 });
 
 test("shorten cuts at a word and adds an ellipsis", () => {
