@@ -64,7 +64,7 @@ export default async function plugin(bb: BbPluginApi) {
     notes: { type: "string", label: "Notes folder", description: "Folder with the Markdown notes. ~ is your home folder.", default: DEFAULTS.notes },
     mempalace: { type: "string", label: "mempalace binary", description: "Path to the mempalace binary. Optional: without it the plugin uses a built-in word search.", default: DEFAULTS.mempalace },
     palace: { type: "string", label: "Search index file", description: "The plugin rebuilds this file from the notes.", default: DEFAULTS.palace },
-    index: { type: "string", label: "Index note", description: "Name of the note that lists every note, without .md. The plugin writes it and deletes the old one when you change the name.", default: DEFAULTS.index },
+    index: { type: "string", label: "Index note", description: "Name of the note that lists every note, without .md. Leave it empty to turn the index off. The plugin deletes the old index when you change this.", default: DEFAULTS.index },
     dateStyle: {
       type: "select",
       label: "Date line",

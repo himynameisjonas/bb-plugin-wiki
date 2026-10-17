@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { firstSection, format, indexContent, writeIndex, lint, lintReport, unsavedThreads, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
@@ -162,6 +162,21 @@ test("writeIndex writes under the configured name and deletes the old index", ()
     assert.equal(existsSync(join(paths.notes, "index.md")), false);
     const index = readFileSync(join(paths.notes, "wiki.md"), "utf8");
     assert.ok(index.includes("[[keep]]") && !index.includes("[[index]]") && !index.includes("[[wiki]]"));
+  } finally {
+    Object.assign(paths, saved);
+  }
+});
+
+test("writeIndex with an empty name writes nothing and deletes the old index", () => {
+  const saved = { ...paths };
+  paths.notes = mkdtempSync(join(tmpdir(), "wiki-"));
+  paths.index = "";
+  writeFileSync(join(paths.notes, "wiki.md"), "# Index\n\nEvery note. The BB wiki plugin writes this file, so don't edit it.\n");
+  writeFileSync(join(paths.notes, "note.md"), "A note\n");
+  try {
+    assert.equal(writeIndex(), true);
+    assert.deepEqual(readdirSync(paths.notes), ["note.md"]);
+    assert.equal(writeIndex(), false);
   } finally {
     Object.assign(paths, saved);
   }

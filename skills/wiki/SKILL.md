@@ -13,7 +13,7 @@ The wiki is a folder of Markdown notes, one topic per note. The folder is set in
 2. Read the top two to four notes in full, not only the snippets.
 3. Answer from the notes. Cite each claim with a Markdown file link to the note, for example `[trainz](/path/to/notes/trainz.md)`. BB makes these clickable. A bare `[[slug]]` in chat is plain text.
 
-`wiki.md` in the notes folder (the plugin's `index` setting) lists every note with its one-line summary. Read it when you need an overview.
+`wiki.md` in the notes folder (the plugin's `index` setting) lists every note with its one-line summary, if the index is on. Read it when you need an overview.
 
 ## Write
 

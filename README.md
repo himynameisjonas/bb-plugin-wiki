@@ -24,7 +24,7 @@ Change them under Settings → Installed plugins → Wiki, or with `bb plugin co
 | `notes` | `~/Documents/Notes/wiki` | Folder with the Markdown notes. It can be a git repo root or a folder inside one. Without git, the plugin still indexes but doesn't commit. |
 | `mempalace` | `~/.local/bin/mempalace` | The [mempalace](https://github.com/bunkerlab-net/mempalace) binary, used for search. Optional: without it the plugin uses a built-in word search (BM25 over whole notes). |
 | `palace` | `~/.local/share/mempalace/wiki.db` | Search index file. The plugin rebuilds it from scratch when notes change. |
-| `index` | `wiki` | Name of the note that lists every note (`wiki.md`). The plugin writes it on each sync and deletes the old file when you change the name. |
+| `index` | `wiki` | Name of the note that lists every note (`wiki.md`). The plugin writes it on each sync and deletes the old file when you change the name. Leave it empty to turn the index off. |
 | `dateStyle` | `obsidian-daily` | Date line on new notes and updates: `obsidian-daily` (`[[daily/YYYY-MM-DD\|YYYY-MM-DD]]`), `plain`, or `none`. |
 
 The notes must be on the same machine as the BB server.

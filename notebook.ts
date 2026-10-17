@@ -18,7 +18,8 @@ const expand = (path: string) => path.trim().replace(/^~(?=$|\/)/, homedir());
 export const paths: Paths = { notes: "", mempalace: "", palace: "", index: "" };
 export function configure(next: Paths) {
   for (const key of Object.keys(DEFAULTS) as (keyof Paths)[]) paths[key] = expand(next[key] || DEFAULTS[key]);
-  paths.index = paths.index.replace(/\.md$/, "");
+  // An empty name turns the index off.
+  paths.index = (next.index ?? DEFAULTS.index).trim().replace(/\.md$/, "");
 }
 configure(DEFAULTS);
 
@@ -264,13 +265,18 @@ export function indexContent(notes: { slug: string; summary: string }[]): string
 }
 
 // Only writes on change, so an unchanged notebook doesn't trigger a commit or an index rebuild.
-// Also deletes index files written under an earlier name, so a rename doesn't leave two.
+// Also deletes index files written under an earlier name, so a rename or turning the index off doesn't leave one behind.
 export function writeIndex(): boolean {
-  const path = join(paths.notes, `${paths.index}.md`);
+  let removed = false;
   for (const file of readdirSync(paths.notes).filter((file) => file.endsWith(".md") && file !== `${paths.index}.md`)) {
     const text = readFileSync(join(paths.notes, file), "utf8");
-    if (text.startsWith("# Index\n\n") && text.includes("The BB wiki plugin writes this file")) rmSync(join(paths.notes, file));
+    if (text.startsWith("# Index\n\n") && text.includes("The BB wiki plugin writes this file")) {
+      rmSync(join(paths.notes, file));
+      removed = true;
+    }
   }
+  if (!paths.index) return removed;
+  const path = join(paths.notes, `${paths.index}.md`);
   const next = indexContent(listNotes());
   if (existsSync(path) && readFileSync(path, "utf8") === next) return false;
   writeFileSync(path, next);
