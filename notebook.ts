@@ -11,16 +11,16 @@ export const DEFAULTS = {
   // Own palace file: `mempalace mine` never drops old chunks of an edited note,
   // so a shared palace.db fills with duplicates. A full rebuild takes ~3s.
   palace: "~/.local/share/mempalace/wiki.db",
+  index: "index",
 };
 type Paths = typeof DEFAULTS;
 const expand = (path: string) => path.trim().replace(/^~(?=$|\/)/, homedir());
-export const paths: Paths = { notes: "", mempalace: "", palace: "" };
+export const paths: Paths = { notes: "", mempalace: "", palace: "", index: "" };
 export function configure(next: Paths) {
   for (const key of Object.keys(DEFAULTS) as (keyof Paths)[]) paths[key] = expand(next[key] || DEFAULTS[key]);
+  paths.index = paths.index.replace(/\.md$/, "");
 }
 configure(DEFAULTS);
-
-export const INDEX = "index";
 
 export type Hit = { slug: string; score: number; text: string };
 
@@ -73,7 +73,7 @@ export function rankNotes(docs: { slug: string; text: string }[], query: string,
 
 export function readNotes(): { slug: string; text: string }[] {
   return readdirSync(paths.notes)
-    .filter((file) => file.endsWith(".md") && file !== `${INDEX}.md`)
+    .filter((file) => file.endsWith(".md") && file !== `${paths.index}.md`)
     .map((file) => ({ slug: file.slice(0, -3), text: readFileSync(join(paths.notes, file), "utf8") }));
 }
 
@@ -120,7 +120,7 @@ export async function search(query: string, limit = 5): Promise<Hit[]> {
     ["--palace", paths.palace, "search", "--wing", "wiki", "--results", String(limit * 3), "--", query.slice(0, 500)],
     { timeout: 5000, maxBuffer: 4 * 1024 * 1024 },
   );
-  return parseHits(stdout).filter((hit) => hit.slug !== INDEX).slice(0, limit);
+  return parseHits(stdout).filter((hit) => hit.slug !== paths.index).slice(0, limit);
 }
 
 export function shorten(text: string, max: number): string {
@@ -198,7 +198,7 @@ export async function commit(message?: string): Promise<boolean> {
     return false;
   }
   if (!status.trim()) return false;
-  const slugs = [...status.matchAll(/([^/\s"]+)\.md"?$/gm)].map((match) => match[1]).filter((slug) => slug !== INDEX);
+  const slugs = [...status.matchAll(/([^/\s"]+)\.md"?$/gm)].map((match) => match[1]).filter((slug) => slug !== paths.index);
   await git("add", "-A", "--", ".");
   await git("commit", "-q", "-m", message ?? `wiki: update ${slugs.join(", ") || "index"}`, "--", ".");
   return true;
@@ -222,7 +222,7 @@ export function relatedNotes(hits: Hit[], describe: (slug: string) => string): s
 
 export function listNotes(): { slug: string; summary: string }[] {
   return readdirSync(paths.notes)
-    .filter((file) => file.endsWith(".md") && file !== `${INDEX}.md`)
+    .filter((file) => file.endsWith(".md") && file !== `${paths.index}.md`)
     .map((file) => ({ file, mtime: statSync(join(paths.notes, file)).mtimeMs }))
     .sort((a, b) => b.mtime - a.mtime)
     .map(({ file }) => {
@@ -264,8 +264,13 @@ export function indexContent(notes: { slug: string; summary: string }[]): string
 }
 
 // Only writes on change, so an unchanged notebook doesn't trigger a commit or an index rebuild.
+// Also deletes index files written under an earlier name, so a rename doesn't leave two.
 export function writeIndex(): boolean {
-  const path = join(paths.notes, `${INDEX}.md`);
+  const path = join(paths.notes, `${paths.index}.md`);
+  for (const file of readdirSync(paths.notes).filter((file) => file.endsWith(".md") && file !== `${paths.index}.md`)) {
+    const text = readFileSync(join(paths.notes, file), "utf8");
+    if (text.startsWith("# Index\n\n") && text.includes("The BB wiki plugin writes this file")) rmSync(join(paths.notes, file));
+  }
   const next = indexContent(listNotes());
   if (existsSync(path) && readFileSync(path, "utf8") === next) return false;
   writeFileSync(path, next);

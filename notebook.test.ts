@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { firstSection, format, indexContent, lint, lintReport, unsavedThreads, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { firstSection, format, indexContent, writeIndex, lint, lintReport, unsavedThreads, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -146,4 +149,20 @@ test("firstSection takes the text between the title and the first ## heading", (
   const note = "_2026-10-17_. Summary\n\nSource: [x](y)\n\n# Title\n\nFirst part.\n\nSecond part.\n\n## Details\n\nNot this.\n";
   assert.equal(firstSection(note), "First part.\n\nSecond part.");
   assert.equal(firstSection("Summary only\n\nBody text\n"), "Body text");
+});
+
+test("writeIndex writes under the configured name and deletes the old index", () => {
+  const saved = { ...paths };
+  paths.notes = mkdtempSync(join(tmpdir(), "wiki-"));
+  paths.index = "wiki";
+  writeFileSync(join(paths.notes, "index.md"), "# Index\n\nEvery note. The BB wiki plugin writes this file, so don't edit it.\n");
+  writeFileSync(join(paths.notes, "keep.md"), "# Index\n\nMy own index, keep it.\n");
+  try {
+    assert.equal(writeIndex(), true);
+    assert.equal(existsSync(join(paths.notes, "index.md")), false);
+    const index = readFileSync(join(paths.notes, "wiki.md"), "utf8");
+    assert.ok(index.includes("[[keep]]") && !index.includes("[[index]]") && !index.includes("[[wiki]]"));
+  } finally {
+    Object.assign(paths, saved);
+  }
 });
