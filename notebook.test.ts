@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { format, indexContent, lint, lintReport, unsavedThreads, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
+import { firstSection, format, indexContent, lint, lintReport, unsavedThreads, matchNotes, rankNotes, shorten, newNote, noteLink, parseHits, paths, relatedNotes, withUpdate, wrapUpMessage } from "./notebook.ts";
 
 const output = `
 ============================================================
@@ -140,4 +140,10 @@ test("unsavedThreads keeps recent threads no note links to", () => {
   const threads = [row("thr_old", 1), row("thr_saved", 10), row("thr_auto", 10, "automations"), row("thr_a", 10), row("thr_b", 20)];
   const docs = [{ text: "Source: [x](http://host/threads/thr_saved)" }];
   assert.deepEqual(unsavedThreads(threads, docs, 5).map((thread) => thread.id), ["thr_b", "thr_a"]);
+});
+
+test("firstSection takes the text between the title and the first ## heading", () => {
+  const note = "_2026-10-17_. Summary\n\nSource: [x](y)\n\n# Title\n\nFirst part.\n\nSecond part.\n\n## Details\n\nNot this.\n";
+  assert.equal(firstSection(note), "First part.\n\nSecond part.");
+  assert.equal(firstSection("Summary only\n\nBody text\n"), "Body text");
 });

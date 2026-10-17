@@ -138,6 +138,14 @@ export function summary(slug: string): string {
   }
 }
 
+// The text under the title, up to the first ## heading, for hover previews in chat.
+export function firstSection(text: string, max = 500): string {
+  const lines = text.split("\n");
+  const title = lines.findIndex((line) => line.startsWith("# "));
+  const body = lines.slice(title >= 0 ? title + 1 : 1).join("\n").split(/^## /m)[0];
+  return shorten(body.replace(/^Source: .*$/m, "").trim(), max);
+}
+
 export function isStale(): boolean {
   let built: number;
   try {

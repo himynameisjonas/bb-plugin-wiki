@@ -1,11 +1,12 @@
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import {
   DATE_STYLES,
   DEFAULTS,
   configure,
+  firstSection,
   paths,
   format,
   hasMempalace,
@@ -42,10 +43,13 @@ const threadNotesSchema = z.object({
   lint: z.object({ orphans: z.number(), broken: z.number(), noRelated: z.number() }),
 });
 export type ThreadNotes = z.infer<typeof threadNotesSchema>;
+const previewSchema = z.object({ slug: z.string(), summary: z.string(), body: z.string() }).nullable();
+export type NotePreview = z.infer<typeof previewSchema>;
 
 export const rpcContract = defineRpcContract({
   thread_notes: { input: z.object({ threadId: z.string() }), output: threadNotesSchema },
   save_and_archive: { input: z.object({ threadId: z.string() }), output: z.object({ queued: z.boolean() }) },
+  note_preview: { input: z.object({ path: z.string() }), output: previewSchema },
 });
 
 const WRAP_UP = [
@@ -148,6 +152,12 @@ export default async function plugin(bb: BbPluginApi) {
       const text = wrapUpMessage(WRAP_UP, linked, related);
       await bb.sdk.threads.send({ threadId, input: [{ type: "text", text, mentions: [] }], mode: "queue-if-active" });
       return { queued: true };
+    },
+    async note_preview({ path }) {
+      const file = resolve(path);
+      if (dirname(file) !== paths.notes || !file.endsWith(".md") || !existsSync(file)) return null;
+      const slug = basename(file, ".md");
+      return { slug, summary: summary(slug), body: firstSection(readFileSync(file, "utf8")) };
     },
     async thread_notes({ threadId }) {
       const { linked, related } = await notesFor(threadId);
