@@ -6,7 +6,7 @@ import {
   useRpc,
 } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
-import type { ThreadNotes, rpcContract } from "./server.ts";
+import type { NotePreview, ThreadNotes, rpcContract } from "./server.ts";
 
 type Note = ThreadNotes["linked"][number];
 
@@ -88,7 +88,50 @@ function SaveAndArchiveButton({ threadId }: { threadId: string }) {
   );
 }
 
+// Chat renders note citations as file:// links. Hovering one shows the note's summary and first section.
+function NotePreviewOverlay() {
+  const rpc = useRpc<typeof rpcContract>();
+  const [card, setCard] = useState<{ preview: NonNullable<NotePreview>; rect: DOMRect } | null>(null);
+
+  useEffect(() => {
+    let current: HTMLAnchorElement | null = null;
+    const onOver = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const link = target?.closest<HTMLAnchorElement>('[data-markdown-preview] a[href^="file:"][href$=".md"]') ?? null;
+      if (link === current) return;
+      current = link;
+      setCard(null);
+      if (!link) return;
+      rpc.call("note_preview", { path: decodeURIComponent(new URL(link.href).pathname) }).then(
+        (preview) => current === link && preview && setCard({ preview, rect: link.getBoundingClientRect() }),
+        () => {},
+      );
+    };
+    document.addEventListener("pointerover", onOver);
+    return () => document.removeEventListener("pointerover", onOver);
+  }, [rpc]);
+
+  if (!card) return null;
+  const { preview, rect } = card;
+  const below = rect.bottom + 280 < window.innerHeight;
+  return (
+    <div
+      role="tooltip"
+      className="pointer-events-none fixed z-50 w-96 space-y-1 rounded-md border bg-popover p-3 text-popover-foreground shadow-md"
+      style={{
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - 392)),
+        ...(below ? { top: rect.bottom + 6 } : { bottom: window.innerHeight - rect.top + 6 }),
+      }}
+    >
+      <div className="text-sm font-medium">{preview.slug}</div>
+      {preview.summary && <p className="text-sm text-muted-foreground">{preview.summary}</p>}
+      {preview.body && <p className="line-clamp-6 whitespace-pre-line text-xs text-muted-foreground">{preview.body}</p>}
+    </div>
+  );
+}
+
 export default definePluginApp((app) => {
+  app.slots.experimental_appOverlay({ id: "note-preview", component: NotePreviewOverlay });
   app.slots.threadPanelAction({ id: "notes", title: "Wiki", component: WikiPanel });
   app.slots.experimental_threadHeaderAction({
     id: "save-and-archive",
