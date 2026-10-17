@@ -7,21 +7,21 @@ const output = `
   Results for: "pippi disk"
 ============================================================
 
-  [1] conclave / general
+  [1] wiki / general
       Source: pippi-sandbox-disk-usage.md
       Match:  bm25=4.7175
 
       Disk fills up on sandbox-1.
 
   --------------------------------------------------------
-  [2] conclave / general
+  [2] wiki / general
       Source: pippi-sandbox-disk-usage.md
       Match:  bm25=3.1000
 
       Same note, other chunk.
 
   --------------------------------------------------------
-  [3] conclave / general
+  [3] wiki / general
       Source: pippi-health-log.md
       Match:  bm25=2.1988
 
@@ -63,7 +63,7 @@ test("relatedNotes keeps up to three notes close to the top score", () => {
   const hits = [6, 5, 4, 3.9, 1].map((score, index) => ({ slug: `n${index}`, score, text: "" }));
   assert.equal(
     relatedNotes(hits, (slug) => `about ${slug}`),
-    `Notes in the user's conclave notebook (${paths.notes}) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:\n- ${noteLink("n0")}: about n0\n- ${noteLink("n1")}: about n1\n- ${noteLink("n2")}: about n2`,
+    `Notes in the user's wiki (${paths.notes}) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:\n- ${noteLink("n0")}: about n0\n- ${noteLink("n1")}: about n1\n- ${noteLink("n2")}: about n2`,
   );
   assert.equal(relatedNotes([{ slug: "weak", score: 1.5, text: "" }], () => ""), null);
 });

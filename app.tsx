@@ -38,7 +38,7 @@ function NoteList({ title, empty, notes, data }: { title: string; empty: string;
   );
 }
 
-function ConclavePanel({ threadId }: { threadId: string }) {
+function WikiPanel({ threadId }: { threadId: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const [data, setData] = useState<ThreadNotes | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ function ConclavePanel({ threadId }: { threadId: string }) {
       <NoteList title="May be related" empty="No related notes found." notes={data.related} data={data} />
       <p className="text-xs text-muted-foreground">
         Notebook: {data.lint.orphans} orphan notes, {data.lint.broken} broken links, {data.lint.noRelated} notes without Related
-        notes. Run <code>bb conclave lint</code> for the lists.
+        notes. Run <code>bb wiki lint</code> for the lists.
       </p>
     </div>
   );
@@ -66,10 +66,10 @@ function SaveAndArchiveButton({ threadId }: { threadId: string }) {
   const [state, setState] = useState<"idle" | "sent" | "failed">("idle");
   const label =
     state === "sent"
-      ? "Saving to conclave. The thread archives when the agent is done."
+      ? "Saving to the wiki. The thread archives when the agent is done."
       : state === "failed"
         ? "Could not start the wrap-up. Try again."
-        : "Save to conclave and archive";
+        : "Save to wiki and archive";
 
   return (
     <button
@@ -83,16 +83,16 @@ function SaveAndArchiveButton({ threadId }: { threadId: string }) {
         rpc.call("save_and_archive", { threadId }).catch(() => setState("failed"));
       }}
     >
-      <Icon name="conclave/icon" fallback="Archive" aria-hidden className="size-4" />
+      <Icon name="wiki/icon" fallback="Archive" aria-hidden className="size-4" />
     </button>
   );
 }
 
 export default definePluginApp((app) => {
-  app.slots.threadPanelAction({ id: "notes", title: "Conclave notes", component: ConclavePanel });
+  app.slots.threadPanelAction({ id: "notes", title: "Wiki", component: WikiPanel });
   app.slots.experimental_threadHeaderAction({
     id: "save-and-archive",
-    title: "Save to conclave and archive",
+    title: "Save to wiki and archive",
     component: SaveAndArchiveButton,
   });
 });

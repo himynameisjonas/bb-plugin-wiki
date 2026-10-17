@@ -49,8 +49,8 @@ export const rpcContract = defineRpcContract({
 });
 
 const WRAP_UP = [
-  "Wrap-up before archiving: save what a future agent needs from this thread to conclave with conclave_save.",
-  "Prefer updating an existing note over creating a new one. Run conclave_search too if the notes below don't cover it.",
+  "Wrap-up before archiving: save what a future agent needs from this thread to the wiki with wiki_save.",
+  "Prefer updating an existing note over creating a new one. Run wiki_search too if the notes below don't cover it.",
   "If nothing here is worth keeping, save nothing and say so.",
   "Reply with one line naming the note. BB archives this thread when you finish.",
 ].join(" ");
@@ -72,7 +72,7 @@ export default async function plugin(bb: BbPluginApi) {
     configure(values);
     format.dateStyle = DATE_STYLES.find((style) => style === values.dateStyle) ?? "obsidian-daily";
     if (!existsSync(paths.notes)) {
-      bb.status.needsConfiguration(`Can't find the notes folder ${paths.notes}. Fix it in the plugin settings, then run \`bb plugin reload conclave\`.`);
+      bb.status.needsConfiguration(`Can't find the notes folder ${paths.notes}. Fix it in the plugin settings, then run \`bb plugin reload wiki\`.`);
     }
     if (!hasMempalace()) bb.log.info(`No mempalace at ${paths.mempalace}, using the built-in word search`);
   };
@@ -166,11 +166,11 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.deleted", ({ thread }) => void related.delete(thread.id));
 
   bb.cli.register({
-    name: "conclave",
-    summary: "Check the conclave notebook",
+    name: "wiki",
+    summary: "Check the wiki",
     commands: [
-      { name: "lint", summary: "List orphan notes, broken [[links]] and notes without ## Related notes", usage: "bb conclave lint" },
-      { name: "unsaved", summary: "List threads from the last days (default 7) that no note links to", usage: "bb conclave unsaved [days]" },
+      { name: "lint", summary: "List orphan notes, broken [[links]] and notes without ## Related notes", usage: "bb wiki lint" },
+      { name: "unsaved", summary: "List threads from the last days (default 7) that no note links to", usage: "bb wiki unsaved [days]" },
     ],
     async run([command, days = "7"]) {
       if (command === "lint") return { exitCode: 0, stdout: lintReport(lint(readNotes())) };
@@ -179,13 +179,13 @@ export default async function plugin(bb: BbPluginApi) {
         const since = Date.now() - Number(days) * 86_400_000;
         return { exitCode: 0, stdout: unsavedReport(unsavedThreads(lists.flat(), readNotes(), since)) };
       }
-      return { exitCode: 1, stderr: "Usage: bb conclave lint | bb conclave unsaved [days]\n" };
+      return { exitCode: 1, stderr: "Usage: bb wiki lint | bb wiki unsaved [days]\n" };
     },
   });
 
   bb.ui.registerMentionProvider({
     id: "note",
-    label: "Conclave",
+    label: "Wiki",
     search({ query }) {
       return matchNotes(listNotes(), query)
         .slice(0, 8)
@@ -194,17 +194,17 @@ export default async function plugin(bb: BbPluginApi) {
     resolve(slug) {
       if (!/^[a-z0-9-]+$/.test(slug)) throw new Error(`Bad note id ${slug}`);
       const path = join(paths.notes, `${slug}.md`);
-      return { context: `Conclave note [[${slug}]] (${path}):\n\n${readFileSync(path, "utf8").slice(0, 30_000)}` };
+      return { context: `Wiki note [[${slug}]] (${path}):\n\n${readFileSync(path, "utf8").slice(0, 30_000)}` };
     },
   });
 
   bb.agents.registerTool({
-    name: "conclave_search",
+    name: "wiki_search",
     description:
-      "Search the user's conclave notebook (personal Markdown notes) by keywords. BM25, so use words likely to appear in a note. Returns note slugs, one-line summaries and matching snippets.",
+      "Search the user's wiki (personal Markdown notes) by keywords. BM25, so use words likely to appear in a note. Returns note slugs, one-line summaries and matching snippets.",
     instructions:
-      "Use conclave_search before starting work that earlier notes might cover, and when the user asks what they know or wrote about something. In chat, cite notes as Markdown file links like [slug](/path/to/slug.md) so they are clickable. Inside notes, keep [[slug]].",
-    presentation: { label: { pending: "Searching conclave", completed: "Searched conclave" } },
+      "Use wiki_search before starting work that earlier notes might cover, and when the user asks what they know or wrote about something. In chat, cite notes as Markdown file links like [slug](/path/to/slug.md) so they are clickable. Inside notes, keep [[slug]].",
+    presentation: { label: { pending: "Searching the wiki", completed: "Searched the wiki" } },
     parameters: z.object({
       query: z.string().min(1),
       limit: z.number().int().min(1).max(10).default(5),
@@ -220,12 +220,12 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.agents.registerTool({
-    name: "conclave_save",
+    name: "wiki_save",
     description:
-      "Write to the user's conclave notebook. mode=create makes a new note; mode=update adds a dated update section to an existing note. Adds the date line and a link to this thread, commits the notes repo and reindexes search.",
+      "Write to the user's wiki. mode=create makes a new note; mode=update adds a dated update section to an existing note. Adds the date line and a link to this thread, commits the notes repo and reindexes search.",
     instructions:
-      "When this thread learns something a future agent needs (hard-won reasoning, a rare recipe, a decision and why), save it with conclave_save without being asked. Search first and update the matching note instead of creating a parallel one. When the note summarizes a link the user pasted (Slack thread, gist, article), pass it as sourceUrl so the source stays traceable. Tell the user the slug.",
-    presentation: { label: { pending: "Saving to conclave", completed: "Saved to conclave" } },
+      "When this thread learns something a future agent needs (hard-won reasoning, a rare recipe, a decision and why), save it with wiki_save without being asked. Search first and update the matching note instead of creating a parallel one. When the note summarizes a link the user pasted (Slack thread, gist, article), pass it as sourceUrl so the source stays traceable. Tell the user the slug.",
+    presentation: { label: { pending: "Saving to the wiki", completed: "Saved to the wiki" } },
     parameters: z.object({
       slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "kebab-case, no .md"),
       mode: z.enum(["create", "update"]),
@@ -244,7 +244,7 @@ export default async function plugin(bb: BbPluginApi) {
         if (!existsSync(path)) return { content: [{ type: "text", text: `No note [[${slug}]]. Use mode=create.` }], isError: true };
         writeFileSync(path, withUpdate(readFileSync(path, "utf8"), today(), source, body));
       }
-      await sync(`conclave: ${mode === "create" ? line : `update ${slug}`}`);
+      await sync(`wiki: ${mode === "create" ? line : `update ${slug}`}`);
       return `Saved ${noteLink(slug)}.`;
     },
   });

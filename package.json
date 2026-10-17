@@ -1,5 +1,5 @@
 {
-  "name": "bb-plugin-conclave",
+  "name": "bb-plugin-wiki",
   "version": "0.1.0",
   "type": "module",
   "engines": {
@@ -7,8 +7,8 @@
     "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
-    "name": "Conclave",
-    "description": "Search and write the conclave notebook from BB threads.",
+    "name": "Wiki",
+    "description": "Search and write a personal wiki of Markdown notes from BB threads.",
     "branding": {
       "icon": "./icon.svg",
       "experimental_icons": {

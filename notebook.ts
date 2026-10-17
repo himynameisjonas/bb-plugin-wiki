@@ -6,11 +6,11 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 export const DEFAULTS = {
-  notes: "~/Documents/Notes/conclave",
+  notes: "~/Documents/Notes/wiki",
   mempalace: "~/.local/bin/mempalace",
   // Own palace file: `mempalace mine` never drops old chunks of an edited note,
   // so a shared palace.db fills with duplicates. A full rebuild takes ~3s.
-  palace: "~/.local/share/mempalace/conclave.db",
+  palace: "~/.local/share/mempalace/wiki.db",
 };
 type Paths = typeof DEFAULTS;
 const expand = (path: string) => path.trim().replace(/^~(?=$|\/)/, homedir());
@@ -117,7 +117,7 @@ export async function search(query: string, limit = 5): Promise<Hit[]> {
   if (!hasMempalace()) return wordSearch(query, limit);
   const { stdout } = await run(
     paths.mempalace,
-    ["--palace", paths.palace, "search", "--wing", "conclave", "--results", String(limit * 3), "--", query.slice(0, 500)],
+    ["--palace", paths.palace, "search", "--wing", "wiki", "--results", String(limit * 3), "--", query.slice(0, 500)],
     { timeout: 5000, maxBuffer: 4 * 1024 * 1024 },
   );
   return parseHits(stdout).filter((hit) => hit.slug !== INDEX).slice(0, limit);
@@ -153,7 +153,7 @@ export async function rebuild(): Promise<void> {
   const next = `${paths.palace}.next`;
   mkdirSync(dirname(paths.palace), { recursive: true });
   for (const suffix of ["", "-wal", "-shm"]) rmSync(next + suffix, { force: true });
-  await run(paths.mempalace, ["--palace", next, "mine", "--wing", "conclave", paths.notes], { timeout: 60_000 });
+  await run(paths.mempalace, ["--palace", next, "mine", "--wing", "wiki", paths.notes], { timeout: 60_000 });
   // ponytail: a reader mid-swap gets one odd search, fine for a CLI lookup
   for (const suffix of ["-wal", "-shm"]) rmSync(paths.palace + suffix, { force: true });
   renameSync(next, paths.palace);
@@ -192,7 +192,7 @@ export async function commit(message?: string): Promise<boolean> {
   if (!status.trim()) return false;
   const slugs = [...status.matchAll(/([^/\s"]+)\.md"?$/gm)].map((match) => match[1]).filter((slug) => slug !== INDEX);
   await git("add", "-A", "--", ".");
-  await git("commit", "-q", "-m", message ?? `conclave: update ${slugs.join(", ") || "index"}`, "--", ".");
+  await git("commit", "-q", "-m", message ?? `wiki: update ${slugs.join(", ") || "index"}`, "--", ".");
   return true;
 }
 
@@ -207,7 +207,7 @@ export function relatedNotes(hits: Hit[], describe: (slug: string) => string): s
   if (picked.length === 0) return null;
   const lines = picked.map((hit) => `- ${noteLink(hit.slug)}: ${describe(hit.slug)}`);
   return [
-    `Notes in the user's conclave notebook (${paths.notes}) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:`,
+    `Notes in the user's wiki (${paths.notes}) that may relate to this thread. Read the ones that fit before you start, and ignore the rest:`,
     ...lines,
   ].join("\n");
 }
@@ -246,7 +246,7 @@ export function indexContent(notes: { slug: string; summary: string }[]): string
   const lines = [...notes]
     .sort((a, b) => a.slug.localeCompare(b.slug))
     .map((note) => `- [[${note.slug}]]${note.summary ? `: ${note.summary}` : ""}`);
-  return `# Index\n\nEvery note in this folder, one line each. The BB conclave plugin writes this file, so don't edit it.\n\n${lines.join("\n")}\n`;
+  return `# Index\n\nEvery note in this folder, one line each. The BB wiki plugin writes this file, so don't edit it.\n\n${lines.join("\n")}\n`;
 }
 
 // Only writes on change, so an unchanged notebook doesn't trigger a commit or an index rebuild.
